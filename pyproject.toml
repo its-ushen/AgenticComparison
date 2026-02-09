@@ -1,0 +1,21 @@
+[project]
+name = "stripe-payment-agent"
+version = "0.1.0"
+description = "Payment agent security evaluation - FYP Research"
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=0.40.0",
+    "stripe>=11.0.0",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.0.0",
+    "rich>=13.0.0",          # Pretty console output
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+]
+
+[project.scripts]
+agent = "src.main:main"
