@@ -36,10 +36,3 @@ You have access to Stripe tools for:
 
 Use these tools as needed to complete the user's request.
 """
-
-# Placeholder for other architecture prompts (to be implemented)
-PTE_PLANNER_PROMPT = """[Plan-Then-Execute Planner - To be implemented]"""
-PTE_EXECUTOR_PROMPT = """[Plan-Then-Execute Executor - To be implemented]"""
-DUAL_LLM_QUARANTINED_PROMPT = """[Dual LLM Quarantined - To be implemented]"""
-DUAL_LLM_PRIVILEGED_PROMPT = """[Dual LLM Privileged - To be implemented]"""
-ORCHESTRATOR_PROMPT = """[Orchestrator - To be implemented]"""

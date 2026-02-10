@@ -5,7 +5,7 @@ description = "Payment agent security evaluation - FYP Research"
 requires-python = ">=3.11"
 dependencies = [
     "anthropic>=0.40.0",
-    "stripe>=11.0.0",
+    "openai>=1.0.0",         # For OpenAI-compatible APIs (Groq, etc.)
     "python-dotenv>=1.0.0",
     "pydantic>=2.0.0",
     "rich>=13.0.0",          # Pretty console output
@@ -14,7 +14,6 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
-    "pytest-asyncio>=0.24.0",
 ]
 
 [project.scripts]

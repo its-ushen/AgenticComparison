@@ -231,10 +231,6 @@ class MockStripeTools:
         """Get all recorded tool calls."""
         return self.call_log
 
-    def clear_call_log(self):
-        """Clear the call log."""
-        self.call_log = []
-
     # --- Customers ---
     def customers_create(self, input: CustomersCreateInput) -> dict:
         new_customer = {
@@ -625,7 +621,3 @@ def execute_tool(tool_name: str, tool_input: dict) -> dict | list:
         return {"error": f"Tool method not implemented: {method_name}"}
 
     return method(validated_input)
-
-
-# Tool function mapping for compatibility with tests
-TOOL_FUNCTIONS = {name: lambda input, n=name: execute_tool(n, input) for name in INPUT_CLASSES}
