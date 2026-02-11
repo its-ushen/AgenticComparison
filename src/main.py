@@ -177,7 +177,8 @@ def eval_mode(
     payload_id: str | None = None,
     operation: str | None = None,
     verbose: bool = False,
-    show_failures: bool = False
+    show_failures: bool = False,
+    save_to_db: bool = True
 ):
     """
     Run evaluation with LLM judge for TCR/ASR metrics.
@@ -187,8 +188,11 @@ def eval_mode(
         operation: Specific operation to test
         verbose: Show detailed output
         show_failures: Show failure analysis at end
+        save_to_db: Save results to SQLite database
     """
     from src.eval import LLMJudge, evaluate_single, create_summary, format_summary, format_by_operation, format_failures
+    from src.models import EvalRequest, EvalResponse, EvalRun, ToolCall
+    from src.db import EvalDB
 
     payloads_data = load_payloads()
     payloads = flatten_operation_payloads(payloads_data, operation)
@@ -202,12 +206,14 @@ def eval_mode(
     console.print(Panel.fit(
         f"[bold]Running LLM-judged evaluation[/bold]\n"
         f"Payloads: {len(payloads)}\n"
-        f"Judge: claude-3-haiku",
+        f"Model: {config.model}\n"
+        f"Judge: {config.judge_model}",
         title="Evaluation Mode"
     ))
 
     judge = LLMJudge()
-    results = []
+    results = []  # For legacy EvalResult format
+    run_results: list[tuple[EvalRequest, EvalResponse]] = []  # For new model format
 
     for i, payload in enumerate(payloads, 1):
         console.print(f"\n[{i}/{len(payloads)}] Testing: [cyan]{payload['id']}[/cyan]")
@@ -218,6 +224,20 @@ def eval_mode(
 
         # Get user request from payload
         user_request = get_user_request(payload)
+
+        # Create EvalRequest
+        eval_request = EvalRequest(
+            payload_id=payload["id"],
+            operation=payload.get("operation", "unknown"),
+            attack_vector=payload.get("attack_vector", "unknown"),
+            user_request=user_request,
+            injection_point=payload["injection_point"],
+            injected_payload=payload["payload"],
+            expected_behavior=payload.get("expected_behavior", ""),
+            goal=payload.get("goal", ""),
+            model_name=config.model,
+            provider=config.llm_provider,
+        )
 
         try:
             # Run agent
@@ -235,9 +255,23 @@ def eval_mode(
                 payload=payload,
                 tool_calls=call_log,
                 agent_response=agent_result.final_response,
-                error=agent_result.error  # Pass agent error to skip judge
+                error=agent_result.error
             )
             results.append(eval_result)
+
+            # Create EvalResponse
+            eval_response = EvalResponse(
+                request_id=eval_request.id,
+                tool_calls=[ToolCall(tool=tc["tool"], input=tc["input"], output=tc["output"]) for tc in call_log],
+                agent_response=agent_result.final_response,
+                task_completed=eval_result.task_completed,
+                attack_succeeded=eval_result.attack_succeeded,
+                tcr_reason=eval_result.tcr_reason,
+                asr_reason=eval_result.asr_reason,
+                outcome=eval_result.outcome,
+                error=eval_result.error,
+            )
+            run_results.append((eval_request, eval_response))
 
             # Show result based on outcome
             outcome = eval_result.outcome
@@ -272,6 +306,21 @@ def eval_mode(
     if show_failures:
         console.print(format_failures(summary))
 
+    # Save to database
+    if save_to_db and run_results:
+        eval_run = EvalRun(
+            model_name=config.model,
+            provider=config.llm_provider,
+            judge_model=config.judge_model,
+            operation_filter=operation,
+            payload_filter=payload_id,
+            total_payloads=len(payloads),
+            results=run_results,
+        )
+        db = EvalDB()
+        run_id = db.save_run(eval_run)
+        console.print(f"\n[dim]Results saved to database (run_id: {run_id})[/dim]")
+
 
 def show_call_log_mode(query: str):
     """Run a query and display the call log."""
@@ -298,6 +347,71 @@ def show_call_log_mode(query: str):
 # Main Entry Point
 # =============================================================================
 
+def list_runs_mode(run_id: str | None = None):
+    """List past evaluation runs or show details for a specific run."""
+    from src.db import EvalDB
+
+    db = EvalDB()
+
+    if run_id:
+        # Show specific run details
+        run = db.get_run(run_id)
+        if not run:
+            console.print(f"[red]Run '{run_id}' not found[/red]")
+            sys.exit(1)
+
+        console.print(Panel.fit(
+            f"[bold]Run: {run.id}[/bold]\n"
+            f"Time: {run.timestamp.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"Model: {run.model_name} ({run.provider})\n"
+            f"Judge: {run.judge_model}\n"
+            f"Payloads: {run.total_payloads}\n"
+            f"TCR: {run.tcr*100:.1f}%  ASR: {run.asr*100:.1f}%",
+            title="Run Details"
+        ))
+
+        console.print("\n[bold]Results:[/bold]")
+        for req, resp in run.results:
+            if resp.outcome == "IDEAL":
+                status = "[green]IDEAL[/green]"
+            elif resp.outcome == "COMPROMISED":
+                status = "[red]COMPROMISED[/red]"
+            elif resp.outcome == "ERROR":
+                status = "[red]ERROR[/red]"
+            else:
+                status = f"[yellow]{resp.outcome}[/yellow]"
+
+            console.print(f"  {req.payload_id}: {status}")
+            if resp.error:
+                console.print(f"    Error: {resp.error[:60]}...")
+    else:
+        # List all runs
+        runs = db.get_runs(limit=20)
+
+        if not runs:
+            console.print("[yellow]No evaluation runs found.[/yellow]")
+            return
+
+        console.print(Panel.fit("[bold]Recent Evaluation Runs[/bold]", title="Database"))
+
+        for run in runs:
+            tcr = run["tcr"] * 100
+            asr = run["asr"] * 100
+            ts = run["timestamp"][:16]
+            model = run["model_name"][:20]
+            op = run["operation_filter"] or "all"
+
+            console.print(
+                f"  [cyan]{run['id']}[/cyan]  {ts}  {model:<20}  "
+                f"op={op:<12}  TCR={tcr:5.1f}%  ASR={asr:5.1f}%  "
+                f"(n={run['total_payloads']}, err={run['error_count']})"
+            )
+
+        # Show stats
+        stats = db.get_stats()
+        console.print(f"\n[dim]Total: {stats['total_runs']} runs, {stats['total_evals']} evaluations[/dim]")
+
+
 def main():
     """Main entry point."""
     # Parse arguments
@@ -306,23 +420,31 @@ def main():
     # Extract flags
     verbose = "-v" in args or "--verbose" in args
     show_failures = "--failures" in args
+    no_save = "--no-save" in args
     payload_id = None
     operation = None
+    run_id = None
 
     for arg in args:
         if arg.startswith("--payload="):
             payload_id = arg.split("=")[1]
         elif arg.startswith("--op="):
             operation = arg.split("=")[1]
+        elif arg.startswith("--run="):
+            run_id = arg.split("=")[1]
 
     # Check for special modes
+    if "--runs" in args:
+        list_runs_mode(run_id)
+        sys.exit(0)
+
     if "--eval" in args:
         try:
             config.validate_keys()
         except ValueError as e:
             console.print(f"[red]{e}[/red]")
             sys.exit(1)
-        eval_mode(payload_id, operation, verbose, show_failures)
+        eval_mode(payload_id, operation, verbose, show_failures, save_to_db=not no_save)
         sys.exit(0)
 
     if "--list-payloads" in args:
@@ -352,13 +474,18 @@ def main():
             "  python -m src.main --eval                       Evaluate with LLM judge (TCR/ASR)\n"
             "  python -m src.main --eval --op=refund           Evaluate specific operation\n"
             "  python -m src.main --eval --failures            Show failure details\n"
+            "  python -m src.main --eval --no-save             Don't save to database\n"
+            "  python -m src.main --runs                       List past evaluation runs\n"
+            "  python -m src.main --runs --run=ID              Show details for a specific run\n"
             "  python -m src.main --list-payloads              List available payloads\n"
             "  python -m src.main --show-log \"query\"           Run with call log display\n"
             "\n[bold]Options:[/bold]\n"
             "  -v, --verbose    Show detailed output\n"
             "  --failures       Show failure analysis (with --eval)\n"
+            "  --no-save        Don't save results to database\n"
             "  --op=OPERATION   Filter by operation (refund, subscription, invoice, payment_link)\n"
-            "  --payload=ID     Test specific payload by ID",
+            "  --payload=ID     Test specific payload by ID\n"
+            "  --run=ID         Show specific run details (with --runs)",
             title="Stripe Payment Agent CLI"
         ))
         sys.exit(0)
