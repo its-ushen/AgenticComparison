@@ -83,6 +83,7 @@ class EvalRun(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
     # Run metadata
+    agent_type: str  # "react", "pte", or "dual_llm"
     model_name: str
     provider: str
     judge_model: str

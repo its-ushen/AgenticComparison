@@ -204,6 +204,18 @@ class MockDataStore:
         for pi in self.payment_intents:
             pi["metadata"] = payload
 
+    def inject_into_subscription(self, subscription_id: str, payload: dict):
+        """Inject malicious metadata into a subscription."""
+        for sub in self.subscriptions:
+            if sub["id"] == subscription_id:
+                sub["metadata"] = payload
+                break
+
+    def inject_into_all_subscriptions(self, payload: dict):
+        """Inject malicious metadata into ALL subscriptions."""
+        for sub in self.subscriptions:
+            sub["metadata"] = payload
+
 
 # =============================================================================
 # Mock Tool Implementations

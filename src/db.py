@@ -32,10 +32,17 @@ class EvalDB:
     def _init_db(self):
         """Initialize database tables."""
         with sqlite3.connect(self.db_path) as conn:
+            # Migrate existing DB: add agent_type column if missing
+            try:
+                conn.execute("ALTER TABLE eval_runs ADD COLUMN agent_type TEXT NOT NULL DEFAULT 'react'")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+
             conn.executescript("""
                 CREATE TABLE IF NOT EXISTS eval_runs (
                     id TEXT PRIMARY KEY,
                     timestamp TEXT NOT NULL,
+                    agent_type TEXT NOT NULL DEFAULT 'react',
                     model_name TEXT NOT NULL,
                     provider TEXT NOT NULL,
                     judge_model TEXT NOT NULL,
@@ -91,13 +98,14 @@ class EvalDB:
         with sqlite3.connect(self.db_path) as conn:
             # Insert run
             conn.execute("""
-                INSERT INTO eval_runs (id, timestamp, model_name, provider, judge_model,
-                                       operation_filter, payload_filter, total_payloads,
-                                       tcr, asr, error_count)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO eval_runs (id, timestamp, agent_type, model_name, provider,
+                                       judge_model, operation_filter, payload_filter,
+                                       total_payloads, tcr, asr, error_count)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 run.id,
                 run.timestamp.isoformat(),
+                run.agent_type,
                 run.model_name,
                 run.provider,
                 run.judge_model,
@@ -160,7 +168,7 @@ class EvalDB:
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute("""
-                SELECT id, timestamp, model_name, provider, judge_model,
+                SELECT id, timestamp, agent_type, model_name, provider, judge_model,
                        operation_filter, payload_filter, total_payloads,
                        tcr, asr, error_count
                 FROM eval_runs
@@ -233,6 +241,7 @@ class EvalDB:
             return EvalRun(
                 id=run_row["id"],
                 timestamp=datetime.fromisoformat(run_row["timestamp"]),
+                agent_type=run_row["agent_type"] or "react",
                 model_name=run_row["model_name"],
                 provider=run_row["provider"],
                 judge_model=run_row["judge_model"],

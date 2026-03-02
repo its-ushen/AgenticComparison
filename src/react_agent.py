@@ -10,7 +10,7 @@ Supports multiple LLM providers via config.llm_provider:
 """
 
 import json
-from dataclasses import dataclass, field
+import time
 from typing import Any
 
 from rich.console import Console
@@ -20,6 +20,7 @@ from rich.markdown import Markdown
 from src.config import config
 from src.tools import TOOLS, execute_tool, get_mock_tools, set_mock_tools, reset_mock_tools, MockStripeTools, MockDataStore
 from src.prompts import REACT_SYSTEM_PROMPT
+from src.base import AgentResult
 
 console = Console()
 
@@ -40,16 +41,6 @@ def _convert_tools_to_openai_format(tools: list[dict]) -> list[dict]:
 
 
 OPENAI_TOOLS = _convert_tools_to_openai_format(TOOLS)
-
-
-@dataclass
-class AgentResult:
-    """Result of an agent run."""
-    success: bool
-    final_response: str
-    turns: int
-    tool_calls: list[dict[str, Any]] = field(default_factory=list)
-    error: str | None = None
 
 
 class ReActAgent:
@@ -168,6 +159,7 @@ class ReActAgent:
         self.reset()
         self.messages.append({"role": "user", "content": user_input})
         self._log("👤 User Input", user_input, style="cyan")
+        t_start = time.time()
 
         iterations = 0
         while iterations < self.max_iterations:
@@ -191,11 +183,14 @@ class ReActAgent:
                     if hasattr(block, "text"):
                         final_text += block.text
                 self._log("🤖 Final Response", final_text, style="green")
+                elapsed = (time.time() - t_start) * 1000
                 return AgentResult(
                     success=True,
                     final_response=final_text,
                     turns=iterations,
                     tool_calls=self.tool_call_history,
+                    latency_ms=elapsed,
+                    latency_breakdown={"total_ms": elapsed},
                 )
 
             elif response.stop_reason == "tool_use":
@@ -223,20 +218,26 @@ class ReActAgent:
                 self.messages.append({"role": "assistant", "content": assistant_content})
                 self.messages.append({"role": "user", "content": tool_results})
             else:
+                elapsed = (time.time() - t_start) * 1000
                 return AgentResult(
                     success=False,
                     final_response="",
                     turns=iterations,
                     tool_calls=self.tool_call_history,
                     error=f"Unexpected stop reason: {response.stop_reason}",
+                    latency_ms=elapsed,
+                    latency_breakdown={"total_ms": elapsed},
                 )
 
+        elapsed = (time.time() - t_start) * 1000
         return AgentResult(
             success=False,
             final_response="",
             turns=iterations,
             tool_calls=self.tool_call_history,
             error="Max iterations reached",
+            latency_ms=elapsed,
+            latency_breakdown={"total_ms": elapsed},
         )
 
     def _run_openai(self, user_input: str) -> AgentResult:
@@ -244,6 +245,7 @@ class ReActAgent:
         self.reset()
         self.messages.append({"role": "user", "content": user_input})
         self._log("👤 User Input", user_input, style="cyan")
+        t_start = time.time()
 
         iterations = 0
         while iterations < self.max_iterations:
@@ -253,12 +255,15 @@ class ReActAgent:
             except Exception as e:
                 error_msg = f"API call failed: {type(e).__name__}: {e}"
                 self._log("❌ API Error", error_msg, style="red")
+                elapsed = (time.time() - t_start) * 1000
                 return AgentResult(
                     success=False,
                     final_response="",
                     turns=iterations,
                     tool_calls=self.tool_call_history,
                     error=error_msg,
+                    latency_ms=elapsed,
+                    latency_breakdown={"total_ms": elapsed},
                 )
             message = response.choices[0].message
 
@@ -266,15 +271,17 @@ class ReActAgent:
             if not message.tool_calls:
                 final_text = message.content or ""
                 self._log("🤖 Final Response", final_text, style="green")
+                elapsed = (time.time() - t_start) * 1000
                 return AgentResult(
                     success=True,
                     final_response=final_text,
                     turns=iterations,
                     tool_calls=self.tool_call_history,
+                    latency_ms=elapsed,
+                    latency_breakdown={"total_ms": elapsed},
                 )
 
             # Process tool calls
-            # Add assistant message with tool calls
             self.messages.append({
                 "role": "assistant",
                 "content": message.content,
@@ -294,7 +301,6 @@ class ReActAgent:
             if message.content:
                 self._log("💭 Thinking", message.content, style="magenta")
 
-            # Execute each tool call and collect results
             for tool_call in message.tool_calls:
                 tool_name = tool_call.function.name
                 try:
@@ -304,19 +310,21 @@ class ReActAgent:
 
                 result = self._process_tool_call_simple(tool_name, tool_input)
 
-                # Add tool result message
                 self.messages.append({
                     "role": "tool",
                     "tool_call_id": tool_call.id,
                     "content": json.dumps(result),
                 })
 
+        elapsed = (time.time() - t_start) * 1000
         return AgentResult(
             success=False,
             final_response="",
             turns=iterations,
             tool_calls=self.tool_call_history,
             error="Max iterations reached",
+            latency_ms=elapsed,
+            latency_breakdown={"total_ms": elapsed},
         )
 
     def run(self, user_input: str) -> AgentResult:
@@ -371,9 +379,17 @@ def run_with_injection(
     elif injection_target.startswith("payment:"):
         payment_id = injection_target.split(":")[1]
         data_store.inject_into_payment(payment_id, injection_payload)
+    elif injection_target == "all_customers":
+        for c in data_store.customers:
+            data_store.inject_into_customer(c["id"], injection_payload)
     elif injection_target.startswith("customer:"):
         customer_id = injection_target.split(":")[1]
         data_store.inject_into_customer(customer_id, injection_payload)
+    elif injection_target.startswith("subscription:"):
+        sub_id = injection_target.split(":")[1]
+        data_store.inject_into_subscription(sub_id, injection_payload)
+    elif injection_target == "all_subscriptions":
+        data_store.inject_into_all_subscriptions(injection_payload)
 
     mock_tools = MockStripeTools(data_store)
 

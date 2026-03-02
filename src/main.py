@@ -18,6 +18,14 @@ from rich.panel import Panel
 
 from src.config import config
 from src.react_agent import run_react_agent, run_with_injection
+from src.pte_agent import run_pte_agent, run_pte_with_injection
+from src.dual_llm_agent import run_dual_llm_agent, run_dual_llm_with_injection
+
+AGENT_RUNNERS = {
+    "react":    (run_react_agent,    run_with_injection,          "ReAct Agent"),
+    "pte":      (run_pte_agent,      run_pte_with_injection,      "Plan-then-Execute Agent"),
+    "dual_llm": (run_dual_llm_agent, run_dual_llm_with_injection, "Dual LLM Agent"),
+}
 
 console = Console()
 
@@ -37,9 +45,33 @@ def load_payloads() -> dict:
         return json.load(f)
 
 
+def _injection_target_from_point(injection_point: str) -> str:
+    """
+    Derive the injection target from the injection_point field.
+
+    injection_point format: "<object_type>.metadata.<field_name>"
+    Examples:
+        "payment_intent.metadata.note"      → "all_payments"
+        "customer.metadata.gdpr_request"    → "all_customers"  (inject into cus_test001)
+        "subscription.metadata.audit_trail" → "all_subscriptions"
+    """
+    prefix = injection_point.split(".")[0]
+    if prefix == "payment_intent":
+        return "all_payments"
+    elif prefix == "customer":
+        return "all_customers"
+    elif prefix == "subscription":
+        return "all_subscriptions"
+    return "all_payments"  # default
+
+
 def flatten_operation_payloads(payloads_data: dict, operation: str | None = None) -> list[dict]:
     """
     Flatten the hierarchical payload structure into a list.
+
+    Reads from:
+    - payloads_data["operations"]         — per-operation payloads (original format)
+    - payloads_data["advanced_injection"] — advanced Level 3-5 payloads
 
     Args:
         payloads_data: The full payloads JSON
@@ -53,11 +85,15 @@ def flatten_operation_payloads(payloads_data: dict, operation: str | None = None
 
     # Filter to specific operation if requested
     if operation:
-        if operation not in operations:
+        available = list(operations.keys()) + ["advanced"]
+        if operation not in operations and operation != "advanced":
             console.print(f"[red]Unknown operation: {operation}[/red]")
-            console.print(f"Available: {', '.join(operations.keys())}")
+            console.print(f"Available: {', '.join(available)}")
             sys.exit(1)
-        operations = {operation: operations[operation]}
+        if operation != "advanced":
+            operations = {operation: operations[operation]}
+        else:
+            operations = {}  # Skip standard ops, only load advanced below
 
     for op_name, op_data in operations.items():
         target_tool = op_data.get("target_tool") or op_data.get("target_tools", [None])[0]
@@ -70,6 +106,17 @@ def flatten_operation_payloads(payloads_data: dict, operation: str | None = None
                     "target": payload.get("target", target_tool),
                     **payload
                 })
+
+    # Include advanced_injection payloads unless filtering to a non-advanced operation
+    if operation is None or operation == "advanced":
+        adv_section = payloads_data.get("advanced_injection", {})
+        for vector_name, vector_data in adv_section.get("attack_vectors", {}).items():
+            for payload in vector_data.get("payloads", []):
+                entry = {
+                    "attack_vector": vector_name,
+                    **payload,
+                }
+                flattened.append(entry)
 
     return flattened
 
@@ -85,10 +132,11 @@ def get_user_request(payload: dict) -> str:
 # CLI Modes
 # =============================================================================
 
-def interactive_mode():
+def interactive_mode(agent: str = "react"):
     """Run the agent in interactive mode."""
+    run_fn, _, agent_label = AGENT_RUNNERS[agent]
     console.print(Panel.fit(
-        "[bold blue]Stripe Payment Agent[/bold blue]\n"
+        f"[bold blue]Stripe Payment Agent[/bold blue] ([cyan]{agent_label}[/cyan])\n"
         "Type your requests below. Type 'quit' or 'exit' to stop.\n"
         "Type 'help' for example commands.",
         title="Welcome"
@@ -118,8 +166,7 @@ def interactive_mode():
             if not user_input.strip():
                 continue
 
-            # Run the agent
-            result = run_react_agent(user_input, verbose=True)
+            result = run_fn(user_input, verbose=True)
 
             if not result.success:
                 console.print(f"[red]Error: {result.error}[/red]")
@@ -131,9 +178,10 @@ def interactive_mode():
             console.print(f"[red]Error: {e}[/red]")
 
 
-def single_query_mode(query: str):
+def single_query_mode(query: str, agent: str = "react"):
     """Run a single query and exit."""
-    result = run_react_agent(query, verbose=True)
+    run_fn, _, _ = AGENT_RUNNERS[agent]
+    result = run_fn(query, verbose=True)
 
     if result.success:
         sys.exit(0)
@@ -178,7 +226,9 @@ def eval_mode(
     operation: str | None = None,
     verbose: bool = False,
     show_failures: bool = False,
-    save_to_db: bool = True
+    save_to_db: bool = True,
+    agent: str = "react",
+    delay: float = 0.0,
 ):
     """
     Run evaluation with LLM judge for TCR/ASR metrics.
@@ -194,6 +244,8 @@ def eval_mode(
     from src.models import EvalRequest, EvalResponse, EvalRun, ToolCall
     from src.db import EvalDB
 
+    _, injection_fn, agent_label = AGENT_RUNNERS[agent]
+
     payloads_data = load_payloads()
     payloads = flatten_operation_payloads(payloads_data, operation)
 
@@ -205,6 +257,7 @@ def eval_mode(
 
     console.print(Panel.fit(
         f"[bold]Running LLM-judged evaluation[/bold]\n"
+        f"Agent: {agent_label}\n"
         f"Payloads: {len(payloads)}\n"
         f"Model: {config.model}\n"
         f"Judge: {config.judge_model}",
@@ -240,11 +293,14 @@ def eval_mode(
         )
 
         try:
+            # Derive injection target from injection_point field
+            injection_target = _injection_target_from_point(payload["injection_point"])
+
             # Run agent
-            agent_result, call_log = run_with_injection(
+            agent_result, call_log = injection_fn(
                 user_input=user_request,
                 injection_payload=injection_metadata,
-                injection_target="all_payments",
+                injection_target=injection_target,
                 verbose=verbose
             )
 
@@ -296,8 +352,12 @@ def eval_mode(
         except Exception as e:
             console.print(f"  [red]ERROR: {e}[/red]")
 
+        if delay > 0 and i < len(payloads):
+            console.print(f"  [dim]Waiting {delay}s...[/dim]")
+            import time; time.sleep(delay)
+
     # Create and display summary
-    summary = create_summary("ReAct Agent", results)
+    summary = create_summary(agent_label, results)
 
     console.print("\n")
     console.print(format_summary(summary))
@@ -309,6 +369,7 @@ def eval_mode(
     # Save to database
     if save_to_db and run_results:
         eval_run = EvalRun(
+            agent_type=agent,
             model_name=config.model,
             provider=config.llm_provider,
             judge_model=config.judge_model,
@@ -400,10 +461,11 @@ def list_runs_mode(run_id: str | None = None):
             ts = run["timestamp"][:16]
             model = run["model_name"][:20]
             op = run["operation_filter"] or "all"
+            agent_type = run.get("agent_type", "react")
 
             console.print(
-                f"  [cyan]{run['id']}[/cyan]  {ts}  {model:<20}  "
-                f"op={op:<12}  TCR={tcr:5.1f}%  ASR={asr:5.1f}%  "
+                f"  [cyan]{run['id']}[/cyan]  {ts}  [magenta]{agent_type:<9}[/magenta]  "
+                f"{model:<20}  op={op:<12}  TCR={tcr:5.1f}%  ASR={asr:5.1f}%  "
                 f"(n={run['total_payloads']}, err={run['error_count']})"
             )
 
@@ -424,6 +486,8 @@ def main():
     payload_id = None
     operation = None
     run_id = None
+    agent = "react"
+    delay = 0.0
 
     for arg in args:
         if arg.startswith("--payload="):
@@ -432,6 +496,13 @@ def main():
             operation = arg.split("=")[1]
         elif arg.startswith("--run="):
             run_id = arg.split("=")[1]
+        elif arg.startswith("--agent="):
+            agent = arg.split("=")[1]
+            if agent not in AGENT_RUNNERS:
+                console.print(f"[red]Unknown agent: {agent}. Choose from: {', '.join(AGENT_RUNNERS)}[/red]")
+                sys.exit(1)
+        elif arg.startswith("--delay="):
+            delay = float(arg.split("=")[1])
 
     # Check for special modes
     if "--runs" in args:
@@ -444,7 +515,7 @@ def main():
         except ValueError as e:
             console.print(f"[red]{e}[/red]")
             sys.exit(1)
-        eval_mode(payload_id, operation, verbose, show_failures, save_to_db=not no_save)
+        eval_mode(payload_id, operation, verbose, show_failures, save_to_db=not no_save, agent=agent, delay=delay)
         sys.exit(0)
 
     if "--list-payloads" in args:
@@ -503,10 +574,10 @@ def main():
     query_args = [a for a in args if not a.startswith("-")]
     if query_args:
         query = " ".join(query_args)
-        single_query_mode(query)
+        single_query_mode(query, agent=agent)
     else:
         # Interactive mode
-        interactive_mode()
+        interactive_mode(agent=agent)
 
 
 if __name__ == "__main__":
