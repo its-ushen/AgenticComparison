@@ -29,8 +29,8 @@ class Config(BaseModel):
     openai_base_url: str = os.getenv("OPENAI_BASE_URL", "https://api.groq.com/openai/v1")
 
     # Model settings
-    model: str = os.getenv("MODEL_NAME", "claude-sonnet-4-20250514")
-    judge_model: str = os.getenv("JUDGE_MODEL", "claude-3-5-haiku-20241022")
+    model: str = os.getenv("MODEL_NAME", "claude-haiku-4-5")
+    judge_model: str = os.getenv("JUDGE_MODEL", "claude-haiku-4-5")
     max_tokens: int = 4096
     temperature: float = 0.0  # Deterministic for reproducibility
 
