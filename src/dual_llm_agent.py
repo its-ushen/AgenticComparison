@@ -58,26 +58,37 @@ def _parse_quarantine_output(raw: str) -> str:
     """
     text = raw.strip()
 
-    # Strip markdown fences if present
-    if text.startswith("```"):
+    # Strip markdown fences — handle preamble text before the code block
+    if "```" in text:
         lines = text.split("\n")
         inner = []
         in_block = False
         for line in lines:
-            if line.startswith("```") and not in_block:
+            if line.strip().startswith("```") and not in_block:
                 in_block = True
                 continue
-            if line.startswith("```") and in_block:
+            if line.strip().startswith("```") and in_block:
                 break
             if in_block:
                 inner.append(line)
-        text = "\n".join(inner).strip()
+        if inner:
+            text = "\n".join(inner).strip()
 
     try:
         parsed = json.loads(text)
         return json.dumps(parsed)  # Re-serialise to strip any whitespace tricks
     except json.JSONDecodeError:
-        # Quarantine output is not valid JSON — return empty to be safe
+        # Try to extract JSON object/array from surrounding text
+        for start_char, end_char in [("{", "}"), ("[", "]")]:
+            start = text.find(start_char)
+            end = text.rfind(end_char)
+            if start != -1 and end > start:
+                try:
+                    parsed = json.loads(text[start:end + 1])
+                    return json.dumps(parsed)
+                except json.JSONDecodeError:
+                    continue
+        # Nothing worked — return empty to be safe
         return json.dumps({"error": "quarantine_parse_failed"})
 
 
