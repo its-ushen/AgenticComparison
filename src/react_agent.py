@@ -18,7 +18,7 @@ from rich.panel import Panel
 from rich.markdown import Markdown
 
 from src.config import config
-from src.tools import TOOLS, execute_tool, get_mock_tools, set_mock_tools, reset_mock_tools, MockStripeTools, MockDataStore
+from src.tools import TOOLS, ANTHROPIC_TOOLS, execute_tool, get_mock_tools, set_mock_tools, reset_mock_tools, MockStripeTools, MockDataStore, _api_name_to_dot
 from src.prompts import REACT_SYSTEM_PROMPT
 from src.base import AgentResult
 
@@ -108,7 +108,7 @@ class ReActAgent:
             max_tokens=config.max_tokens,
             temperature=config.temperature,
             system=REACT_SYSTEM_PROMPT,
-            tools=TOOLS,
+            tools=ANTHROPIC_TOOLS,
             messages=self.messages,
         )
         return response
@@ -202,13 +202,14 @@ class ReActAgent:
                         self._log("💭 Thinking", block.text, style="magenta")
                         assistant_content.append({"type": "text", "text": block.text})
                     elif block.type == "tool_use":
+                        tool_name_dot = _api_name_to_dot(block.name)
                         assistant_content.append({
                             "type": "tool_use",
                             "id": block.id,
                             "name": block.name,
                             "input": block.input,
                         })
-                        result = self._process_tool_call_simple(block.name, block.input)
+                        result = self._process_tool_call_simple(tool_name_dot, block.input)
                         tool_results.append({
                             "type": "tool_result",
                             "tool_use_id": block.id,

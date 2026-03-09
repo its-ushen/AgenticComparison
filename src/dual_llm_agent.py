@@ -35,7 +35,7 @@ from rich.console import Console
 from rich.panel import Panel
 
 from src.config import config
-from src.tools import TOOLS, execute_tool, get_mock_tools, set_mock_tools, reset_mock_tools, MockStripeTools, MockDataStore
+from src.tools import TOOLS, ANTHROPIC_TOOLS, execute_tool, get_mock_tools, set_mock_tools, reset_mock_tools, MockStripeTools, MockDataStore, _api_name_to_dot
 from src.prompts import DUAL_LLM_ORCHESTRATOR_PROMPT, DUAL_LLM_QUARANTINE_PROMPT
 from src.base import AgentResult
 from src.react_agent import _convert_tools_to_openai_format
@@ -207,7 +207,7 @@ class DualLLMAgent:
             max_tokens=config.max_tokens,
             temperature=config.temperature,
             system=DUAL_LLM_ORCHESTRATOR_PROMPT,
-            tools=TOOLS,
+            tools=ANTHROPIC_TOOLS,
             messages=self.messages,
         )
 
@@ -277,6 +277,7 @@ class DualLLMAgent:
                         self._log("💭 Orchestrator Thinking", block.text, style="magenta")
                         assistant_content.append({"type": "text", "text": block.text})
                     elif block.type == "tool_use":
+                        tool_name_dot = _api_name_to_dot(block.name)
                         assistant_content.append({
                             "type": "tool_use",
                             "id": block.id,
@@ -285,23 +286,23 @@ class DualLLMAgent:
                         })
 
                         self._log(
-                            f"🔧 Orchestrator Tool Call: {block.name}",
+                            f"🔧 Orchestrator Tool Call: {tool_name_dot}",
                             json.dumps(block.input, indent=2),
                             style="cyan",
                         )
 
                         # Execute tool → raw result
-                        raw_result = execute_tool(block.name, block.input)
+                        raw_result = execute_tool(tool_name_dot, block.input)
 
                         # Record for eval (raw, so eval can see what actually happened)
                         self.tool_call_history.append({
-                            "tool": block.name,
+                            "tool": tool_name_dot,
                             "input": block.input,
                             "output": raw_result,
                         })
 
                         # Quarantine: sanitize before orchestrator sees it
-                        clean_result = self._quarantine(block.name, raw_result)
+                        clean_result = self._quarantine(tool_name_dot, raw_result)
 
                         tool_results.append({
                             "type": "tool_result",

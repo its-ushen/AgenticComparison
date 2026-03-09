@@ -604,13 +604,34 @@ def reset_mock_tools():
     _mock_tools = MockStripeTools()
 
 
+def _api_name_to_dot(name: str) -> str:
+    """Convert API-safe tool name back to dot notation. e.g. 'customers_read' → 'customers.read'"""
+    if name in INPUT_CLASSES:
+        return name  # Already dot notation
+    # Reverse lookup from ANTHROPIC_TOOLS mapping
+    for dot_name in INPUT_CLASSES:
+        if dot_name.replace(".", "_") == name:
+            return dot_name
+    return name
+
+
+# Anthropic-compatible TOOLS (dots replaced with underscores in names)
+ANTHROPIC_TOOLS = [
+    {**tool, "name": tool["name"].replace(".", "_")}
+    for tool in TOOLS
+]
+
+
 def execute_tool(tool_name: str, tool_input: dict) -> dict | list:
     """
     Execute a tool by name with the given input.
 
     This is the bridge between Claude's tool_use and our mock implementations.
-    Tool names use dot notation (e.g., "customers.read").
+    Accepts both dot notation (e.g., "customers.read") and underscore
+    notation (e.g., "customers_read") for Anthropic API compatibility.
     """
+    # Convert underscore names back to dot notation
+    tool_name = _api_name_to_dot(tool_name)
     tools = get_mock_tools()
 
     if tool_name not in INPUT_CLASSES:
