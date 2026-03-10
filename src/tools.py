@@ -259,9 +259,10 @@ class MockStripeTools:
         return result
 
     def customers_read(self, input: CustomersReadInput) -> list[dict]:
-        customers = self.data.customers[:input.limit]
+        customers = self.data.customers
         if input.email:
             customers = [c for c in customers if c.get("email") == input.email]
+        customers = customers[:input.limit]
 
         self._log_call("customers.read", input.model_dump(), customers)
         return customers
