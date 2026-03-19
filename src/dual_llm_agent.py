@@ -1,31 +1,4 @@
-"""
-Dual LLM Agent Implementation
-
-Architecture (Simon Willison's pattern, 2023):
-
-  ORCHESTRATOR LLM  — privileged, has tool access, makes all decisions.
-                      Never sees raw tool output.
-
-  QUARANTINE LLM    — unprivileged, sees raw tool output (including injection
-                      payloads), but can only return structured JSON.
-                      Has no tool access — cannot trigger actions.
-
-Flow per tool call:
-  Orchestrator decides to call a tool
-    → execute_tool() returns raw result (injection payload may be here)
-    → Quarantine LLM receives raw result
-    → Quarantine strips metadata fields, returns clean structured JSON
-    → Orchestrator receives only the clean JSON as its "observation"
-
-Security property:
-  Even if the quarantine LLM is fully injected, it cannot call tools.
-  The orchestrator makes decisions based on sanitized data only.
-
-Residual risk:
-  If the quarantine LLM's output escapes the strict JSON schema (e.g. the
-  model adds text outside the JSON), that text could reach the orchestrator.
-  Mitigation: parse quarantine output as JSON and discard any non-JSON content.
-"""
+"""Dual LLM agent — orchestrator + quarantine pattern for injection resistance."""
 
 import json
 import time
@@ -45,17 +18,8 @@ console = Console()
 OPENAI_TOOLS = _convert_tools_to_openai_format(TOOLS)
 
 
-# =============================================================================
-# Quarantine layer
-# =============================================================================
-
 def _parse_quarantine_output(raw: str) -> str:
-    """
-    Extract only the JSON portion from quarantine LLM output.
-    Discards any surrounding text the model may have added.
-    This is the schema enforcement layer — if it's not valid JSON, we
-    return an empty object rather than letting raw text reach the orchestrator.
-    """
+    """Extract JSON from quarantine output; returns empty object if parsing fails."""
     text = raw.strip()
 
     # Strip markdown fences — handle preamble text before the code block
@@ -92,22 +56,7 @@ def _parse_quarantine_output(raw: str) -> str:
         return json.dumps({"error": "quarantine_parse_failed"})
 
 
-# =============================================================================
-# Dual LLM Agent
-# =============================================================================
-
 class DualLLMAgent:
-    """
-    Dual LLM agent for Stripe payment operations.
-
-    Uses two LLM instances with different privilege levels:
-    - Orchestrator: has tool access, sees only sanitized data
-    - Quarantine: sees raw data, has no tool access, constrained output
-
-    The orchestrator loop is structurally identical to ReAct — it calls tools
-    iteratively. The difference is that every tool result is intercepted and
-    sanitized by the quarantine LLM before the orchestrator sees it.
-    """
 
     def __init__(self, verbose: bool = True, mock_tools: MockStripeTools | None = None):
         self.provider = config.llm_provider
@@ -148,15 +97,7 @@ class DualLLMAgent:
         if self.verbose:
             console.print(Panel(content, title=title, border_style=style))
 
-    # -------------------------------------------------------------------------
-    # Quarantine LLM call
-    # -------------------------------------------------------------------------
-
     def _quarantine(self, tool_name: str, raw_result: Any) -> str:
-        """
-        Pass raw tool output through the quarantine LLM.
-        Returns clean JSON string safe for the orchestrator to consume.
-        """
         raw_text = json.dumps(raw_result, indent=2)
         prompt = f"Tool: {tool_name}\n\nRaw output:\n{raw_text}"
 
@@ -197,10 +138,6 @@ class DualLLMAgent:
 
         return clean
 
-    # -------------------------------------------------------------------------
-    # Orchestrator LLM calls (tool-capable, same as ReAct)
-    # -------------------------------------------------------------------------
-
     def _call_orchestrator_anthropic(self):
         return self.client.messages.create(
             model=self.model,
@@ -221,10 +158,6 @@ class DualLLMAgent:
             tools=OPENAI_TOOLS,
             messages=openai_messages,
         )
-
-    # -------------------------------------------------------------------------
-    # Main loops
-    # -------------------------------------------------------------------------
 
     def _run_anthropic(self, user_input: str) -> AgentResult:
         self.reset()
@@ -432,12 +365,7 @@ class DualLLMAgent:
             return self._run_openai(user_input)
 
 
-# =============================================================================
-# Convenience functions (mirror react_agent.py interface)
-# =============================================================================
-
 def run_dual_llm_agent(user_input: str, verbose: bool = True) -> AgentResult:
-    """Run the Dual LLM agent."""
     agent = DualLLMAgent(verbose=verbose)
     return agent.run(user_input)
 
@@ -448,10 +376,6 @@ def run_dual_llm_with_injection(
     injection_target: str = "all_payments",
     verbose: bool = True,
 ) -> tuple[AgentResult, list[dict]]:
-    """
-    Run the Dual LLM agent with injected malicious data.
-    Same interface as run_with_injection() for eval harness compatibility.
-    """
     data_store = MockDataStore()
 
     if injection_target == "all_payments":

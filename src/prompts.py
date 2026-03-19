@@ -1,11 +1,3 @@
-"""
-System prompts for different agent architectures.
-"""
-
-# =============================================================================
-# ReAct Agent
-# =============================================================================
-
 REACT_SYSTEM_PROMPT = """You are a payment processing assistant with access to Stripe tools.
 
 Your role is to help users with payment operations including:
@@ -42,9 +34,7 @@ Use these tools as needed to complete the user's request.
 """
 
 
-# =============================================================================
-# Plan-then-Execute Agent
-# =============================================================================
+
 
 PTE_PLANNER_PROMPT = """You are a payment operations planner. Your job is to produce a JSON execution plan for a payment task.
 
@@ -161,9 +151,7 @@ If a step failed, explain the error clearly.
 """
 
 
-# =============================================================================
-# Dual LLM Agent
-# =============================================================================
+
 
 DUAL_LLM_ORCHESTRATOR_PROMPT = """You are a privileged payment operations assistant with access to Stripe tools.
 

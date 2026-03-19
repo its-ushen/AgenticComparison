@@ -1,12 +1,4 @@
-"""
-Configuration and environment setup for the payment agent.
-
-Supports multiple LLM providers:
-- anthropic: Claude models (default)
-- openai: OpenAI-compatible APIs (Groq, OpenRouter, Together, etc.)
-
-Set LLM_PROVIDER=openai and configure OPENAI_API_KEY + OPENAI_BASE_URL for alternatives.
-"""
+"""Config — loads from .env, supports anthropic and openai-compatible providers."""
 
 import os
 from dotenv import load_dotenv
@@ -16,8 +8,6 @@ load_dotenv()
 
 
 class Config(BaseModel):
-    """Application configuration."""
-
     # LLM Provider: "anthropic" or "openai"
     llm_provider: str = os.getenv("LLM_PROVIDER", "anthropic")
 
@@ -38,7 +28,6 @@ class Config(BaseModel):
     max_iterations: int = 10  # Prevent infinite loops
 
     def validate_keys(self) -> bool:
-        """Check that required API keys are present."""
         if self.llm_provider == "anthropic":
             if not self.anthropic_api_key:
                 raise ValueError("ANTHROPIC_API_KEY not set in environment")
@@ -50,5 +39,4 @@ class Config(BaseModel):
         return True
 
 
-# Global config instance
 config = Config()

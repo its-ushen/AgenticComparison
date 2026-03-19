@@ -1,13 +1,4 @@
-"""
-ReAct Agent Implementation
-
-This is the baseline agent that interleaves reasoning and acting.
-It serves as the control condition for security evaluation.
-
-Supports multiple LLM providers via config.llm_provider:
-- "anthropic": Claude models
-- "openai": OpenAI-compatible APIs (Groq, OpenRouter, Together, etc.)
-"""
+"""ReAct agent — baseline architecture for the security evaluation."""
 
 import json
 import time
@@ -44,19 +35,6 @@ OPENAI_TOOLS = _convert_tools_to_openai_format(TOOLS)
 
 
 class ReActAgent:
-    """
-    ReAct (Reasoning + Acting) Agent
-
-    This agent interleaves thinking and tool use in a loop:
-    1. Receive user input
-    2. Think about what to do
-    3. Call a tool (if needed)
-    4. Observe the result
-    5. Repeat until task is complete
-
-    SECURITY NOTE: This architecture is vulnerable to indirect prompt injection
-    because tool results (untrusted data) directly influence subsequent reasoning.
-    """
 
     def __init__(self, verbose: bool = True, mock_tools: MockStripeTools | None = None):
         self.provider = config.llm_provider
@@ -85,7 +63,6 @@ class ReActAgent:
             reset_mock_tools()
 
     def reset(self):
-        """Reset the agent state for a new conversation."""
         self.messages = []
         self.tool_call_history = []
         # Don't reset mock tools if custom ones were provided (for injection testing)
@@ -93,16 +70,13 @@ class ReActAgent:
             reset_mock_tools()
 
     def get_mock_call_log(self) -> list[dict]:
-        """Get the call log from mock tools (for analysis)."""
         return get_mock_tools().get_call_log()
 
     def _log(self, title: str, content: str, style: str = "blue"):
-        """Log output if verbose mode is enabled."""
         if self.verbose:
             console.print(Panel(content, title=title, border_style=style))
 
     def _call_llm_anthropic(self):
-        """Make a call to the Anthropic Claude API."""
         response = self.client.messages.create(
             model=self.model,
             max_tokens=config.max_tokens,
@@ -114,8 +88,7 @@ class ReActAgent:
         return response
 
     def _call_llm_openai(self):
-        """Make a call to an OpenAI-compatible API."""
-        # Convert messages to OpenAI format (add system message)
+        # prepend system message for OpenAI format
         openai_messages = [{"role": "system", "content": REACT_SYSTEM_PROMPT}]
         openai_messages.extend(self.messages)
 
@@ -129,7 +102,6 @@ class ReActAgent:
         return response
 
     def _process_tool_call_simple(self, tool_name: str, tool_input: dict) -> dict[str, Any]:
-        """Execute a tool and return the result."""
         self._log(
             f"🔧 Tool Call: {tool_name}",
             json.dumps(tool_input, indent=2),
@@ -329,27 +301,13 @@ class ReActAgent:
         )
 
     def run(self, user_input: str) -> AgentResult:
-        """
-        Run the agent with the given user input.
-
-        This implements the ReAct loop:
-        - Think (LLM generates reasoning)
-        - Act (LLM calls a tool)
-        - Observe (tool result is added to context)
-        - Repeat until done
-        """
         if self.provider == "anthropic":
             return self._run_anthropic(user_input)
         else:
             return self._run_openai(user_input)
 
 
-# =============================================================================
-# Convenience functions for running the agent
-# =============================================================================
-
 def run_react_agent(user_input: str, verbose: bool = True) -> AgentResult:
-    """Run the ReAct agent with the given input."""
     agent = ReActAgent(verbose=verbose)
     return agent.run(user_input)
 
@@ -394,9 +352,6 @@ def run_with_injection(
 
     mock_tools = MockStripeTools(data_store)
 
-    # Run agent with injected tools
     agent = ReActAgent(verbose=verbose, mock_tools=mock_tools)
     result = agent.run(user_input)
-
-    # Return result and call log for analysis
     return result, agent.get_mock_call_log()

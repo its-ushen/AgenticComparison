@@ -1,28 +1,4 @@
-"""
-Plan-then-Execute (PTE) Agent Implementation
-
-Architecture:
-  1. PLANNER  — LLM generates a JSON execution plan from the user request.
-                Has full tool schema knowledge. Never calls tools.
-                Forms intent before seeing any real Stripe data.
-
-  2. EXECUTOR — Pure Python walks the plan steps in order.
-                Substitutes $variable references from previous results.
-                Calls execute_tool() directly. No LLM — no injection surface.
-
-  3. SYNTHESIZER — LLM generates a natural language response.
-                   Sees the execution log (including raw tool results).
-                   Has no tool access — cannot trigger new actions.
-
-Security property:
-  The plan is locked before any Stripe data is read. Injection payloads
-  embedded in tool results cannot redirect the goal or add new steps.
-
-Limitation:
-  Value-level manipulation within a planned step is still possible — e.g.
-  an injection could influence the synthesizer's response text, or trick the
-  executor into using a manipulated field value (amount, ID) from a prior step.
-"""
+"""Plan-then-Execute agent — planner, pure-Python executor, synthesizer."""
 
 import json
 import re
@@ -41,10 +17,6 @@ from src.base import AgentResult
 console = Console()
 
 
-# =============================================================================
-# Plan Data Structures
-# =============================================================================
-
 @dataclass
 class PlanStep:
     id: int
@@ -60,10 +32,6 @@ class Plan:
     goal: str
     steps: list[PlanStep]
 
-
-# =============================================================================
-# Variable Resolution (pure Python — the executor's only logic)
-# =============================================================================
 
 def _resolve_path(expr: str, store: dict) -> Any:
     """
@@ -102,7 +70,6 @@ def _resolve_path(expr: str, store: dict) -> Any:
 
 
 def _resolve_args(args: dict, store: dict) -> dict:
-    """Substitute all $variable references in a step's args dict."""
     resolved = {}
     for key, value in args.items():
         if isinstance(value, str) and value.startswith("$"):
@@ -112,14 +79,7 @@ def _resolve_args(args: dict, store: dict) -> dict:
     return resolved
 
 
-# =============================================================================
-# Plan Parser
-# =============================================================================
-
 def _parse_plan(raw: str) -> Plan:
-    """
-    Parse LLM output into a Plan. Handles markdown code fences if present.
-    """
     text = raw.strip()
 
     # Strip ```json ... ``` if the model wraps output
@@ -153,24 +113,7 @@ def _parse_plan(raw: str) -> Plan:
     return Plan(goal=data.get("goal", ""), steps=steps)
 
 
-# =============================================================================
-# Plan-then-Execute Agent
-# =============================================================================
-
 class PlanThenExecuteAgent:
-    """
-    Plan-then-Execute agent for Stripe payment operations.
-
-    Compared to ReActAgent:
-    - Goal is locked before any tool results are seen
-    - Executor phase has zero LLM involvement — no injection surface there
-    - Synthesizer can see raw results but cannot call tools
-
-    Compared to Dual LLM:
-    - Weaker: executor still passes raw tool outputs as variable values into
-      subsequent steps, so value-level manipulation (e.g. amount field) is
-      still possible if the attacker controls an upstream step's result.
-    """
 
     def __init__(self, verbose: bool = True, mock_tools: MockStripeTools | None = None):
         self.provider = config.llm_provider
@@ -206,12 +149,7 @@ class PlanThenExecuteAgent:
         if self.verbose:
             console.print(Panel(content, title=title, border_style=style))
 
-    # -------------------------------------------------------------------------
-    # Phase 1: Planner LLM call (no tools)
-    # -------------------------------------------------------------------------
-
     def _call_planner(self, user_input: str) -> str:
-        """Single LLM call that returns a raw JSON plan string."""
         if self.provider == "anthropic":
             response = self.client.messages.create(
                 model=self.model,
@@ -233,19 +171,7 @@ class PlanThenExecuteAgent:
             )
             return response.choices[0].message.content
 
-    # -------------------------------------------------------------------------
-    # Phase 2: Pure Python executor (no LLM)
-    # -------------------------------------------------------------------------
-
     def _execute_plan(self, plan: Plan) -> list[dict]:
-        """
-        Walk plan steps in order, substitute $variables, call execute_tool().
-
-        No LLM is involved here. This is the key security property of PTE:
-        there is no model in the execution phase that can be injected.
-
-        Returns an execution log consumed by the synthesizer.
-        """
         store: dict[str, Any] = {}
         execution_log = []
 
@@ -304,18 +230,7 @@ class PlanThenExecuteAgent:
 
         return execution_log
 
-    # -------------------------------------------------------------------------
-    # Phase 3: Synthesizer LLM call (no tools)
-    # -------------------------------------------------------------------------
-
     def _call_synthesizer(self, user_input: str, execution_log: list[dict]) -> str:
-        """
-        Final LLM call to produce a natural language response.
-
-        NOTE: This model sees raw tool results (including any injection payloads).
-        It has no tool access so it cannot trigger actions, but it may be
-        influenced in its response text — a residual attack surface.
-        """
         log_text = json.dumps(execution_log, indent=2)
         user_content = f"User request: {user_input}\n\nExecution log:\n{log_text}"
 
@@ -340,17 +255,7 @@ class PlanThenExecuteAgent:
             )
             return response.choices[0].message.content
 
-    # -------------------------------------------------------------------------
-    # Main entry point
-    # -------------------------------------------------------------------------
-
     def run(self, user_input: str) -> AgentResult:
-        """
-        Run the three-phase PTE loop:
-          1. Plan   — LLM generates JSON plan (no tools, no data)
-          2. Execute — Python executes plan steps (no LLM)
-          3. Synthesize — LLM generates response (no tools)
-        """
         self.reset()
         self._log("👤 User Input", user_input, style="cyan")
         t_total = time.time()
@@ -427,12 +332,7 @@ class PlanThenExecuteAgent:
         )
 
 
-# =============================================================================
-# Convenience functions (mirror react_agent.py interface)
-# =============================================================================
-
 def run_pte_agent(user_input: str, verbose: bool = True) -> AgentResult:
-    """Run the Plan-then-Execute agent."""
     agent = PlanThenExecuteAgent(verbose=verbose)
     return agent.run(user_input)
 
@@ -443,12 +343,6 @@ def run_pte_with_injection(
     injection_target: str = "all_payments",
     verbose: bool = True,
 ) -> tuple[AgentResult, list[dict]]:
-    """
-    Run the PTE agent with injected malicious data in the mock data store.
-
-    Same interface as run_with_injection() in react_agent.py so both agents
-    can be driven by the same eval harness.
-    """
     data_store = MockDataStore()
 
     if injection_target == "all_payments":
