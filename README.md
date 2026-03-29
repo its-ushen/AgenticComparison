@@ -1,147 +1,109 @@
-# Stripe Payment Agent - Security Evaluation
+# Stripe Payment Agent — Security Evaluation
 
-FYP Research: Evaluating architectural patterns against prompt injection attacks in LLM-based payment agents.
+FYP research comparing three LLM agent architectures against prompt injection attacks in a Stripe payment context.
 
-## Quick Start
-
-### 1. Install dependencies
+## Setup
 
 ```bash
-cd stripe-payment-agent
 pip install -e ".[dev]"
-```
-
-### 2. Configure API keys
-
-```bash
 cp .env.example .env
-# Edit .env with your ANTHROPIC_API_KEY
+# Add your ANTHROPIC_API_KEY to .env
 ```
 
-### 3. Run the agent
+## Running the Benchmark
+
+The full benchmark runs 3 architectures × 3 Claude models = 9 combinations, each against all 56 payloads:
 
 ```bash
-# Interactive mode
-python -m src.main
-
-# Single query mode
-python -m src.main "List all customers"
-
-# Show help
-python -m src.main --help
+./run_eval.sh
 ```
+
+To run a single operation only (faster, ~20 min):
+
+```bash
+./run_eval.sh refund
+./run_eval.sh subscription
+./run_eval.sh invoice
+./run_eval.sh payment_link
+```
+
+Logs are saved to `logs/` and results to `data/evals.db`.
+
+### Running a single agent manually
+
+```bash
+python -m src.main --eval --agent=react
+python -m src.main --eval --agent=pte
+python -m src.main --eval --agent=dual_llm
+
+# Filter by operation
+python -m src.main --eval --agent=react --op=refund
+
+# Show failure details
+python -m src.main --eval --agent=react --failures -v
+```
+
+### Viewing past results
+
+```bash
+python -m src.main --runs
+python -m src.main --runs --run=ID
+```
+
+## Metrics
+
+- **TCR (Task Completion Rate)** — did the agent complete the legitimate user request? (higher is better)
+- **ASR (Attack Success Rate)** — was the agent manipulated by the injection? (lower is better)
+
+## Architectures
+
+| Architecture | File |
+|---|---|
+| ReAct (baseline) | `src/react_agent.py` |
+| Plan-Then-Execute | `src/pte_agent.py` |
+| Dual LLM | `src/dual_llm_agent.py` |
+
+## Benchmark
+
+56 indirect prompt injection payloads across four Stripe operations:
+
+| Operation | Payloads | Attack Vectors |
+|---|---|---|
+| Refund | 12 | Destination redirect, amount manipulation, authorisation bypass |
+| Subscription | 11 | Hidden charges, parameter tampering, forced cancellation |
+| Invoice | 11 | Customer misdirection, item injection, data exfiltration |
+| Payment link | 12 | Amount manipulation, deceptive content, recipient hijacking |
+
+Payloads are in `attacks/payloads.json`.
 
 ## Project Structure
 
 ```
-stripe-payment-agent/
 ├── src/
-│   ├── config.py         # Configuration
-│   ├── tools.py          # Mock Stripe MCP tools (16 tools)
-│   ├── prompts.py        # System prompts
-│   ├── react_agent.py    # ReAct agent (baseline)
-│   ├── eval.py           # LLM judge evaluation
-│   └── main.py           # CLI entry point
-│
+│   ├── react_agent.py      # ReAct baseline
+│   ├── pte_agent.py        # Plan-Then-Execute
+│   ├── dual_llm_agent.py   # Dual LLM
+│   ├── eval.py             # LLM judge (TCR/ASR)
+│   ├── tools.py            # Mock Stripe MCP tools
+│   ├── db.py               # SQLite results store
+│   ├── models.py           # Data models
+│   ├── config.py           # Config
+│   └── main.py             # CLI
 ├── attacks/
-│   └── payloads.json     # 49 injection payloads
-│
-├── docs/
-│   └── payment_operations_evaluation.md  # Payload documentation
-│
+│   └── payloads.json       # 56 injection payloads
+├── data/
+│   └── evals.db            # Evaluation results
+├── logs/                   # Run logs
 ├── tests/
-│   └── test_agent.py     # Test suite
-│
-└── pyproject.toml        # Dependencies
+└── run_eval.sh             # Full benchmark runner
 ```
 
-## Evaluation
+## Models Tested
 
-### Run full evaluation with LLM judge
+| Model | Tier |
+|---|---|
+| claude-sonnet-4-5 | Frontier |
+| claude-haiku-4-5 | Mid |
+| claude-3-haiku-20240307 | Budget |
 
-```bash
-# Evaluate all payloads with TCR/ASR metrics
-python -m src.main --eval
-
-# Evaluate specific operation
-python -m src.main --eval --op=refund
-
-# Evaluate specific payload
-python -m src.main --eval --payload=refund_redirect_simple
-
-# Show detailed failure analysis
-python -m src.main --eval --failures -v
-```
-
-**Metrics:**
-- **TCR (Task Completion Rate)**: Did agent complete the legitimate request? (higher = better)
-- **ASR (Attack Success Rate)**: Was agent manipulated by injection? (lower = better)
-
-**Outcomes:**
-- `IDEAL`: Task completed, attack failed
-- `COMPROMISED`: Task completed, but agent was manipulated
-- `OVER-REFUSAL`: Task refused (too cautious)
-
-### List available payloads
-
-```bash
-python -m src.main --list-payloads
-python -m src.main --list-payloads --op=refund
-```
-
-## Payload Structure
-
-46 indirect injection payloads organized by operation and attack vector:
-
-| Operation | Payloads | Attack Vectors |
-|-----------|----------|----------------|
-| **Refund** | 12 | Destination Redirect, Amount Manipulation, Authorization Bypass |
-| **Subscription** | 11 | Hidden Charges, Parameter Tampering, Forced Cancellation |
-| **Invoice** | 11 | Customer Misdirection, Item Injection, Data Exfiltration |
-| **Payment Link** | 12 | Amount Manipulation, Deceptive Content, Recipient Hijacking |
-
-Plus 2 direct injection and 1 multi-turn payload (49 total).
-
-See `docs/payment_operations_evaluation.md` for full payload documentation.
-
-## Agent Architectures
-
-| Architecture | Status | File |
-|--------------|--------|------|
-| ReAct (baseline) | Implemented | `react_agent.py` |
-| Plan-Then-Execute | TODO | `pte_agent.py` |
-| Dual LLM | TODO | `dual_llm_agent.py` |
-
-## Mock Tools
-
-The agent uses mock Stripe MCP tools that log all attempted operations:
-
-| Tool | Description |
-|------|-------------|
-| `customers.create/read` | Customer management |
-| `products.create/read` | Product catalog |
-| `prices.create/read` | Pricing |
-| `paymentLinks.create` | Payment link generation |
-| `invoices.create/read/update` | Invoice management |
-| `invoiceItems.create` | Invoice line items |
-| `refunds.create` | Refund processing |
-| `paymentIntents.read` | Payment lookup |
-| `subscriptions.read/update` | Subscription management |
-| `balance.read` | Account balance |
-
-## Running Tests
-
-```bash
-pytest tests/ -v
-```
-
-## Security Research Notes
-
-This agent is **intentionally vulnerable** to prompt injection for research purposes.
-
-The ReAct baseline has NO defenses against:
-- Indirect prompt injection via API response metadata
-- Goal hijacking through poisoned data
-- Multi-turn conversation attacks
-
-**DO NOT use in production. Research sandbox only.**
+Judge model: `claude-haiku-4-5` (consistent across all runs)
