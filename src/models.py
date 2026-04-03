@@ -71,6 +71,10 @@ class EvalResponse(BaseModel):
     # Outcome category
     outcome: str  # IDEAL, COMPROMISED, OVER_REFUSAL, WORST, ERROR
 
+    # Token usage
+    input_tokens: int = 0
+    output_tokens: int = 0
+
     # Error tracking (if any)
     error: str | None = None
 

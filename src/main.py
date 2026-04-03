@@ -325,6 +325,8 @@ def eval_mode(
                 tcr_reason=eval_result.tcr_reason,
                 asr_reason=eval_result.asr_reason,
                 outcome=eval_result.outcome,
+                input_tokens=agent_result.input_tokens,
+                output_tokens=agent_result.output_tokens,
                 error=eval_result.error,
             )
             run_results.append((eval_request, eval_response))

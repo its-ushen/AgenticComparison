@@ -44,6 +44,8 @@ class ReActAgent:
         self.messages: list[dict[str, Any]] = []
         self.tool_call_history: list[dict[str, Any]] = []
         self._custom_mock_tools = mock_tools is not None
+        self._input_tokens: int = 0
+        self._output_tokens: int = 0
 
         # Initialize the appropriate client
         if self.provider == "anthropic":
@@ -65,7 +67,8 @@ class ReActAgent:
     def reset(self):
         self.messages = []
         self.tool_call_history = []
-        # Don't reset mock tools if custom ones were provided (for injection testing)
+        self._input_tokens = 0
+        self._output_tokens = 0
         if not self._custom_mock_tools:
             reset_mock_tools()
 
@@ -149,6 +152,9 @@ class ReActAgent:
                     error=error_msg,
                 )
 
+            self._input_tokens += response.usage.input_tokens
+            self._output_tokens += response.usage.output_tokens
+
             if response.stop_reason == "end_turn":
                 final_text = ""
                 for block in response.content:
@@ -163,6 +169,8 @@ class ReActAgent:
                     tool_calls=self.tool_call_history,
                     latency_ms=elapsed,
                     latency_breakdown={"total_ms": elapsed},
+                    input_tokens=self._input_tokens,
+                    output_tokens=self._output_tokens,
                 )
 
             elif response.stop_reason == "tool_use":
@@ -239,6 +247,8 @@ class ReActAgent:
                     latency_breakdown={"total_ms": elapsed},
                 )
             message = response.choices[0].message
+            self._input_tokens += response.usage.prompt_tokens
+            self._output_tokens += response.usage.completion_tokens
 
             # Check if done (no tool calls)
             if not message.tool_calls:
@@ -252,6 +262,8 @@ class ReActAgent:
                     tool_calls=self.tool_call_history,
                     latency_ms=elapsed,
                     latency_breakdown={"total_ms": elapsed},
+                    input_tokens=self._input_tokens,
+                    output_tokens=self._output_tokens,
                 )
 
             # Process tool calls
