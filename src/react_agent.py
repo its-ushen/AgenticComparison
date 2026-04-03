@@ -193,7 +193,7 @@ class ReActAgent:
                         tool_results.append({
                             "type": "tool_result",
                             "tool_use_id": block.id,
-                            "content": json.dumps(result),
+                            "content": f"<external_content>\n{json.dumps(result)}\n</external_content>",
                         })
 
                 self.messages.append({"role": "assistant", "content": assistant_content})
@@ -298,7 +298,7 @@ class ReActAgent:
                 self.messages.append({
                     "role": "tool",
                     "tool_call_id": tool_call.id,
-                    "content": json.dumps(result),
+                    "content": f"<external_content>\n{json.dumps(result)}\n</external_content>",
                 })
 
         elapsed = (time.time() - t_start) * 1000
