@@ -121,6 +121,8 @@ class PlanThenExecuteAgent:
         self.verbose = verbose
         self.tool_call_history: list[dict[str, Any]] = []
         self._custom_mock_tools = mock_tools is not None
+        self._input_tokens: int = 0
+        self._output_tokens: int = 0
 
         if self.provider == "anthropic":
             import anthropic
@@ -139,6 +141,8 @@ class PlanThenExecuteAgent:
 
     def reset(self):
         self.tool_call_history = []
+        self._input_tokens = 0
+        self._output_tokens = 0
         if not self._custom_mock_tools:
             reset_mock_tools()
 
@@ -158,6 +162,8 @@ class PlanThenExecuteAgent:
                 system=PTE_PLANNER_PROMPT,
                 messages=[{"role": "user", "content": user_input}],
             )
+            self._input_tokens += response.usage.input_tokens
+            self._output_tokens += response.usage.output_tokens
             return response.content[0].text
         else:
             response = self.client.chat.completions.create(
@@ -169,6 +175,8 @@ class PlanThenExecuteAgent:
                     {"role": "user", "content": user_input},
                 ],
             )
+            self._input_tokens += response.usage.prompt_tokens
+            self._output_tokens += response.usage.completion_tokens
             return response.choices[0].message.content
 
     def _execute_plan(self, plan: Plan) -> list[dict]:
@@ -242,6 +250,8 @@ class PlanThenExecuteAgent:
                 system=PTE_SYNTHESIZER_PROMPT,
                 messages=[{"role": "user", "content": user_content}],
             )
+            self._input_tokens += response.usage.input_tokens
+            self._output_tokens += response.usage.output_tokens
             return response.content[0].text
         else:
             response = self.client.chat.completions.create(
@@ -253,6 +263,8 @@ class PlanThenExecuteAgent:
                     {"role": "user", "content": user_content},
                 ],
             )
+            self._input_tokens += response.usage.prompt_tokens
+            self._output_tokens += response.usage.completion_tokens
             return response.choices[0].message.content
 
     def run(self, user_input: str) -> AgentResult:
@@ -329,6 +341,8 @@ class PlanThenExecuteAgent:
                 "synthesizer_ms": synthesizer_ms,
                 "total_ms": total_ms,
             },
+            input_tokens=self._input_tokens,
+            output_tokens=self._output_tokens,
         )
 
 

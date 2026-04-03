@@ -67,6 +67,8 @@ class DualLLMAgent:
         self.tool_call_history: list[dict[str, Any]] = []
         self._custom_mock_tools = mock_tools is not None
         self._quarantine_call_times: list[float] = []
+        self._input_tokens: int = 0
+        self._output_tokens: int = 0
 
         if self.provider == "anthropic":
             import anthropic
@@ -87,6 +89,8 @@ class DualLLMAgent:
         self.messages = []
         self.tool_call_history = []
         self._quarantine_call_times = []
+        self._input_tokens = 0
+        self._output_tokens = 0
         if not self._custom_mock_tools:
             reset_mock_tools()
 
@@ -111,6 +115,8 @@ class DualLLMAgent:
                     system=DUAL_LLM_QUARANTINE_PROMPT,
                     messages=[{"role": "user", "content": prompt}],
                 )
+                self._input_tokens += response.usage.input_tokens
+                self._output_tokens += response.usage.output_tokens
                 raw_output = response.content[0].text
             else:
                 response = self.client.chat.completions.create(
@@ -122,6 +128,8 @@ class DualLLMAgent:
                         {"role": "user", "content": prompt},
                     ],
                 )
+                self._input_tokens += response.usage.prompt_tokens
+                self._output_tokens += response.usage.completion_tokens
                 raw_output = response.choices[0].message.content or ""
         except Exception as e:
             raw_output = json.dumps({"error": f"quarantine_api_failed: {e}"})
@@ -180,6 +188,9 @@ class DualLLMAgent:
                     latency_ms=elapsed, latency_breakdown={"total_ms": elapsed},
                 )
 
+            self._input_tokens += response.usage.input_tokens
+            self._output_tokens += response.usage.output_tokens
+
             if response.stop_reason == "end_turn":
                 final_text = "".join(
                     block.text for block in response.content if hasattr(block, "text")
@@ -199,6 +210,8 @@ class DualLLMAgent:
                         "quarantine_total_ms": sum(q_times),
                         "avg_quarantine_ms": sum(q_times) / len(q_times) if q_times else 0,
                     },
+                    input_tokens=self._input_tokens,
+                    output_tokens=self._output_tokens,
                 )
 
             elif response.stop_reason == "tool_use":
@@ -283,6 +296,8 @@ class DualLLMAgent:
                 )
 
             message = response.choices[0].message
+            self._input_tokens += response.usage.prompt_tokens
+            self._output_tokens += response.usage.completion_tokens
 
             if not message.tool_calls:
                 final_text = message.content or ""
@@ -301,6 +316,8 @@ class DualLLMAgent:
                         "quarantine_total_ms": sum(q_times),
                         "avg_quarantine_ms": sum(q_times) / len(q_times) if q_times else 0,
                     },
+                    input_tokens=self._input_tokens,
+                    output_tokens=self._output_tokens,
                 )
 
             self.messages.append({
