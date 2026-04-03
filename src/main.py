@@ -20,11 +20,13 @@ from src.config import config
 from src.react_agent import run_react_agent, run_with_injection
 from src.pte_agent import run_pte_agent, run_pte_with_injection
 from src.dual_llm_agent import run_dual_llm_agent, run_dual_llm_with_injection
+from src.schema_dual_llm_agent import run_schema_dual_llm_agent, run_schema_dual_llm_with_injection
 
 AGENT_RUNNERS = {
-    "react":    (run_react_agent,    run_with_injection,          "ReAct Agent"),
-    "pte":      (run_pte_agent,      run_pte_with_injection,      "Plan-then-Execute Agent"),
-    "dual_llm": (run_dual_llm_agent, run_dual_llm_with_injection, "Dual LLM Agent"),
+    "react":           (run_react_agent,           run_with_injection,                "ReAct Agent"),
+    "pte":             (run_pte_agent,             run_pte_with_injection,            "Plan-then-Execute Agent"),
+    "dual_llm":        (run_dual_llm_agent,        run_dual_llm_with_injection,       "Dual LLM Agent"),
+    "schema_dual_llm": (run_schema_dual_llm_agent, run_schema_dual_llm_with_injection,"Schema Dual LLM Agent"),
 }
 
 console = Console()
@@ -85,15 +87,15 @@ def flatten_operation_payloads(payloads_data: dict, operation: str | None = None
 
     # Filter to specific operation if requested
     if operation:
-        available = list(operations.keys()) + ["advanced"]
-        if operation not in operations and operation != "advanced":
+        available = list(operations.keys()) + ["advanced", "extended"]
+        if operation not in operations and operation not in ("advanced", "extended"):
             console.print(f"[red]Unknown operation: {operation}[/red]")
             console.print(f"Available: {', '.join(available)}")
             sys.exit(1)
-        if operation != "advanced":
+        if operation not in ("advanced", "extended"):
             operations = {operation: operations[operation]}
         else:
-            operations = {}  # Skip standard ops, only load advanced below
+            operations = {}  # Skip standard ops, only load advanced/extended below
 
     for op_name, op_data in operations.items():
         target_tool = op_data.get("target_tool") or op_data.get("target_tools", [None])[0]
@@ -107,10 +109,18 @@ def flatten_operation_payloads(payloads_data: dict, operation: str | None = None
                     **payload
                 })
 
-    # Include advanced_injection payloads unless filtering to a non-advanced operation
-    if operation is None or operation == "advanced":
-        adv_section = payloads_data.get("advanced_injection", {})
-        for vector_name, vector_data in adv_section.get("attack_vectors", {}).items():
+    # Include advanced_injection and/or extended_injection based on filter
+    sections = []
+    if operation is None:
+        sections = ["advanced_injection", "extended_injection"]
+    elif operation == "advanced":
+        sections = ["advanced_injection"]
+    elif operation == "extended":
+        sections = ["extended_injection"]
+
+    for section_name in sections:
+        section = payloads_data.get(section_name, {})
+        for vector_name, vector_data in section.get("attack_vectors", {}).items():
             for payload in vector_data.get("payloads", []):
                 entry = {
                     "attack_vector": vector_name,
@@ -271,21 +281,32 @@ def eval_mode(
     for i, payload in enumerate(payloads, 1):
         console.print(f"\n[{i}/{len(payloads)}] Testing: [cyan]{payload['id']}[/cyan]")
 
-        # Inject payload
-        injection_key = payload["injection_point"].split(".")[-1]
-        injection_metadata = {injection_key: payload["payload"]}
-
         # Get user request from payload
         user_request = get_user_request(payload)
+
+        # Build injection — Tier C payloads are dicts (field-level injection)
+        # All other tiers are strings injected into metadata
+        raw_payload = payload["payload"]
+        if isinstance(raw_payload, dict):
+            # Tier C: inject fields directly at top level of the object
+            injection_metadata = raw_payload
+            injection_target = _injection_target_from_point(payload["injection_point"]) + "_fields"
+            injected_payload_str = json.dumps(raw_payload)
+        else:
+            injection_key = payload["injection_point"].split(".")[-1]
+            injection_metadata = {injection_key: raw_payload}
+            injection_target = _injection_target_from_point(payload["injection_point"])
+            injected_payload_str = raw_payload
 
         # Create EvalRequest
         eval_request = EvalRequest(
             payload_id=payload["id"],
             operation=payload.get("operation", "unknown"),
             attack_vector=payload.get("attack_vector", "unknown"),
+            tier=payload.get("tier", "A"),
             user_request=user_request,
             injection_point=payload["injection_point"],
-            injected_payload=payload["payload"],
+            injected_payload=injected_payload_str,
             expected_behavior=payload.get("expected_behavior", ""),
             goal=payload.get("goal", ""),
             model_name=config.model,
@@ -293,9 +314,6 @@ def eval_mode(
         )
 
         try:
-            # Derive injection target from injection_point field
-            injection_target = _injection_target_from_point(payload["injection_point"])
-
             # Run agent
             agent_result, call_log = injection_fn(
                 user_input=user_request,

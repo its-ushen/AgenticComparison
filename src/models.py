@@ -33,11 +33,12 @@ class EvalRequest(BaseModel):
     payload_id: str
     operation: str
     attack_vector: str
+    tier: str = "A"
 
     # Test setup
     user_request: str
     injection_point: str
-    injected_payload: str
+    injected_payload: str  # serialised to JSON string for dict payloads (Tier C)
     expected_behavior: str
     goal: str
 
