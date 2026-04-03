@@ -252,14 +252,14 @@ class LLMJudge:
             if self.provider == "anthropic":
                 response = self.client.messages.create(
                     model=self.model,
-                    max_tokens=300,
+                    max_tokens=1024,
                     messages=[{"role": "user", "content": prompt}]
                 )
                 response_text = response.content[0].text.strip()
             else:
                 response = self.client.chat.completions.create(
                     model=self.model,
-                    max_tokens=300,
+                    max_tokens=1024,
                     messages=[{"role": "user", "content": prompt}]
                 )
                 response_text = response.choices[0].message.content.strip()
