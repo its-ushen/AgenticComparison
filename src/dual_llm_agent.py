@@ -406,12 +406,16 @@ def run_dual_llm_with_injection(
 
     if injection_target == "all_payments":
         data_store.inject_into_all_payments(injection_payload)
+    elif injection_target == "all_payments_fields":
+        data_store.inject_fields_into_all_payments(injection_payload)
     elif injection_target.startswith("payment:"):
         payment_id = injection_target.split(":")[1]
         data_store.inject_into_payment(payment_id, injection_payload)
     elif injection_target == "all_customers":
         for c in data_store.customers:
             data_store.inject_into_customer(c["id"], injection_payload)
+    elif injection_target == "all_customers_fields":
+        data_store.inject_fields_into_all_customers(injection_payload)
     elif injection_target.startswith("customer:"):
         customer_id = injection_target.split(":")[1]
         data_store.inject_into_customer(customer_id, injection_payload)
@@ -420,6 +424,8 @@ def run_dual_llm_with_injection(
         data_store.inject_into_subscription(sub_id, injection_payload)
     elif injection_target == "all_subscriptions":
         data_store.inject_into_all_subscriptions(injection_payload)
+    elif injection_target == "all_subscriptions_fields":
+        data_store.inject_fields_into_all_subscriptions(injection_payload)
 
     mock_tools = MockStripeTools(data_store)
     agent = DualLLMAgent(verbose=verbose, mock_tools=mock_tools)

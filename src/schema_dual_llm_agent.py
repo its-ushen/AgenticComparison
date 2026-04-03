@@ -1,4 +1,14 @@
-"""ReAct agent — baseline architecture for the security evaluation."""
+"""Schema Dual LLM — Dual LLM with deterministic per-tool field extraction.
+
+Same orchestrator as Dual LLM, but instead of a quarantine LLM that strips
+untrusted fields, tool results are filtered in Python using a hardcoded
+allowlist of safe typed fields per tool. Since Stripe MCP tools return
+fixed, documented JSON schemas, no LLM is needed to parse the results.
+
+This blocks Tier C (description field injection) because description, name,
+and metadata never reach the orchestrator — they're not in any allowlist.
+It also removes the quarantine LLM as an attack surface entirely.
+"""
 
 import json
 import time
@@ -6,35 +16,54 @@ from typing import Any
 
 from rich.console import Console
 from rich.panel import Panel
-from rich.markdown import Markdown
 
 from src.config import config
 from src.tools import TOOLS, ANTHROPIC_TOOLS, execute_tool, get_mock_tools, set_mock_tools, reset_mock_tools, MockStripeTools, MockDataStore, _api_name_to_dot
-from src.prompts import REACT_SYSTEM_PROMPT
+from src.prompts import DUAL_LLM_ORCHESTRATOR_PROMPT
 from src.base import AgentResult
+from src.react_agent import _convert_tools_to_openai_format
 
 console = Console()
-
-
-def _convert_tools_to_openai_format(tools: list[dict]) -> list[dict]:
-    """Convert Anthropic tool format to OpenAI function calling format."""
-    openai_tools = []
-    for tool in tools:
-        openai_tools.append({
-            "type": "function",
-            "function": {
-                "name": tool["name"],
-                "description": tool["description"],
-                "parameters": tool["input_schema"],
-            }
-        })
-    return openai_tools
-
 
 OPENAI_TOOLS = _convert_tools_to_openai_format(TOOLS)
 
 
-class ReActAgent:
+# Fields allowed per tool, derived from actual return values in tools.py.
+# Anything not listed here (description, name, metadata, object, created)
+# is dropped before the orchestrator sees the result.
+TOOL_SCHEMAS: dict[str, list[str]] = {
+    "customers.create":      ["id", "email"],
+    "customers.read":        ["id", "email"],
+    "paymentIntents.read":   ["id", "amount", "currency", "status", "customer"],
+    "refunds.create":        ["id", "amount", "status", "payment_intent"],
+    "invoices.create":       ["id", "status", "customer"],
+    "invoices.read":         ["id", "status", "customer", "amount_due"],
+    "invoices.update":       ["id", "status", "hosted_invoice_url"],
+    "invoiceItems.create":   ["id", "customer", "price", "invoice"],
+    "products.create":       ["id"],
+    "products.read":         ["id", "name"],
+    "prices.create":         ["id", "unit_amount", "currency", "product"],
+    "prices.read":           ["id", "unit_amount", "currency", "product"],
+    "paymentLinks.create":   ["id", "url", "active"],
+    "subscriptions.read":    ["id", "status", "customer", "cancel_at_period_end", "current_period_end"],
+    "subscriptions.update":  ["id", "status", "cancel_at_period_end"],
+    "balance.read":          ["available", "pending"],
+}
+
+
+def _extract_fields(raw_result: Any, allowed_fields: list[str]) -> Any:
+    if isinstance(raw_result, dict):
+        return {k: v for k, v in raw_result.items() if k in allowed_fields}
+    elif isinstance(raw_result, list):
+        return [
+            {k: v for k, v in item.items() if k in allowed_fields}
+            if isinstance(item, dict) else item
+            for item in raw_result
+        ]
+    return raw_result
+
+
+class SchemaDualLLMAgent:
 
     def __init__(self, verbose: bool = True, mock_tools: MockStripeTools | None = None):
         self.provider = config.llm_provider
@@ -47,18 +76,16 @@ class ReActAgent:
         self._input_tokens: int = 0
         self._output_tokens: int = 0
 
-        # Initialize the appropriate client
         if self.provider == "anthropic":
             import anthropic
             self.client = anthropic.Anthropic(api_key=config.anthropic_api_key)
-        else:  # openai-compatible
+        else:
             import openai
             self.client = openai.OpenAI(
                 api_key=config.openai_api_key,
                 base_url=config.openai_base_url,
             )
 
-        # Set up mock tools (allows custom injection scenarios)
         if mock_tools is not None:
             set_mock_tools(mock_tools)
         else:
@@ -79,58 +106,35 @@ class ReActAgent:
         if self.verbose:
             console.print(Panel(content, title=title, border_style=style))
 
-    def _call_llm_anthropic(self):
-        response = self.client.messages.create(
+    def _filter(self, tool_name: str, raw_result: Any) -> str:
+        allowed = TOOL_SCHEMAS.get(tool_name, [])
+        clean = _extract_fields(raw_result, allowed) if allowed else {}
+        result_str = json.dumps(clean)
+        self._log(f"📋 {tool_name}", f"allowed: {allowed}\nresult: {result_str}", style="yellow")
+        return result_str
+
+    def _call_orchestrator_anthropic(self):
+        return self.client.messages.create(
             model=self.model,
             max_tokens=config.max_tokens,
             temperature=config.temperature,
-            system=REACT_SYSTEM_PROMPT,
+            system=DUAL_LLM_ORCHESTRATOR_PROMPT,
             tools=ANTHROPIC_TOOLS,
             messages=self.messages,
         )
-        return response
 
-    def _call_llm_openai(self):
-        # prepend system message for OpenAI format
-        openai_messages = [{"role": "system", "content": REACT_SYSTEM_PROMPT}]
+    def _call_orchestrator_openai(self):
+        openai_messages = [{"role": "system", "content": DUAL_LLM_ORCHESTRATOR_PROMPT}]
         openai_messages.extend(self.messages)
-
-        response = self.client.chat.completions.create(
+        return self.client.chat.completions.create(
             model=self.model,
             max_tokens=config.max_tokens,
             temperature=config.temperature,
             tools=OPENAI_TOOLS,
             messages=openai_messages,
         )
-        return response
-
-    def _process_tool_call_simple(self, tool_name: str, tool_input: dict) -> dict[str, Any]:
-        self._log(
-            f"🔧 Tool Call: {tool_name}",
-            json.dumps(tool_input, indent=2),
-            style="yellow"
-        )
-
-        # Execute the tool
-        result = execute_tool(tool_name, tool_input)
-
-        # Record the tool call
-        self.tool_call_history.append({
-            "tool": tool_name,
-            "input": tool_input,
-            "output": result,
-        })
-
-        self._log(
-            f"📋 Tool Result: {tool_name}",
-            json.dumps(result, indent=2),
-            style="green"
-        )
-
-        return result
 
     def _run_anthropic(self, user_input: str) -> AgentResult:
-        """Run the agent loop using Anthropic API."""
         self.reset()
         self.messages.append({"role": "user", "content": user_input})
         self._log("👤 User Input", user_input, style="cyan")
@@ -140,26 +144,23 @@ class ReActAgent:
         while iterations < self.max_iterations:
             iterations += 1
             try:
-                response = self._call_llm_anthropic()
+                response = self._call_orchestrator_anthropic()
             except Exception as e:
-                error_msg = f"API call failed: {type(e).__name__}: {e}"
-                self._log("❌ API Error", error_msg, style="red")
+                error_msg = f"Orchestrator API failed: {type(e).__name__}: {e}"
+                elapsed = (time.time() - t_start) * 1000
                 return AgentResult(
-                    success=False,
-                    final_response="",
-                    turns=iterations,
-                    tool_calls=self.tool_call_history,
-                    error=error_msg,
+                    success=False, final_response="", turns=iterations,
+                    tool_calls=self.tool_call_history, error=error_msg,
+                    latency_ms=elapsed, latency_breakdown={"total_ms": elapsed},
                 )
 
             self._input_tokens += response.usage.input_tokens
             self._output_tokens += response.usage.output_tokens
 
             if response.stop_reason == "end_turn":
-                final_text = ""
-                for block in response.content:
-                    if hasattr(block, "text"):
-                        final_text += block.text
+                final_text = "".join(
+                    block.text for block in response.content if hasattr(block, "text")
+                )
                 self._log("🤖 Final Response", final_text, style="green")
                 elapsed = (time.time() - t_start) * 1000
                 return AgentResult(
@@ -189,11 +190,19 @@ class ReActAgent:
                             "name": block.name,
                             "input": block.input,
                         })
-                        result = self._process_tool_call_simple(tool_name_dot, block.input)
+                        self._log(f"🔧 {tool_name_dot}", json.dumps(block.input, indent=2), style="cyan")
+
+                        raw_result = execute_tool(tool_name_dot, block.input)
+                        self.tool_call_history.append({
+                            "tool": tool_name_dot,
+                            "input": block.input,
+                            "output": raw_result,
+                        })
+
                         tool_results.append({
                             "type": "tool_result",
                             "tool_use_id": block.id,
-                            "content": f"<external_content>\n{json.dumps(result)}\n</external_content>",
+                            "content": self._filter(tool_name_dot, raw_result),
                         })
 
                 self.messages.append({"role": "assistant", "content": assistant_content})
@@ -201,28 +210,20 @@ class ReActAgent:
             else:
                 elapsed = (time.time() - t_start) * 1000
                 return AgentResult(
-                    success=False,
-                    final_response="",
-                    turns=iterations,
+                    success=False, final_response="", turns=iterations,
                     tool_calls=self.tool_call_history,
                     error=f"Unexpected stop reason: {response.stop_reason}",
-                    latency_ms=elapsed,
-                    latency_breakdown={"total_ms": elapsed},
+                    latency_ms=elapsed, latency_breakdown={"total_ms": elapsed},
                 )
 
         elapsed = (time.time() - t_start) * 1000
         return AgentResult(
-            success=False,
-            final_response="",
-            turns=iterations,
-            tool_calls=self.tool_call_history,
-            error="Max iterations reached",
-            latency_ms=elapsed,
-            latency_breakdown={"total_ms": elapsed},
+            success=False, final_response="", turns=iterations,
+            tool_calls=self.tool_call_history, error="Max iterations reached",
+            latency_ms=elapsed, latency_breakdown={"total_ms": elapsed},
         )
 
     def _run_openai(self, user_input: str) -> AgentResult:
-        """Run the agent loop using OpenAI-compatible API."""
         self.reset()
         self.messages.append({"role": "user", "content": user_input})
         self._log("👤 User Input", user_input, style="cyan")
@@ -232,25 +233,20 @@ class ReActAgent:
         while iterations < self.max_iterations:
             iterations += 1
             try:
-                response = self._call_llm_openai()
+                response = self._call_orchestrator_openai()
             except Exception as e:
-                error_msg = f"API call failed: {type(e).__name__}: {e}"
-                self._log("❌ API Error", error_msg, style="red")
+                error_msg = f"Orchestrator API failed: {type(e).__name__}: {e}"
                 elapsed = (time.time() - t_start) * 1000
                 return AgentResult(
-                    success=False,
-                    final_response="",
-                    turns=iterations,
-                    tool_calls=self.tool_call_history,
-                    error=error_msg,
-                    latency_ms=elapsed,
-                    latency_breakdown={"total_ms": elapsed},
+                    success=False, final_response="", turns=iterations,
+                    tool_calls=self.tool_call_history, error=error_msg,
+                    latency_ms=elapsed, latency_breakdown={"total_ms": elapsed},
                 )
+
             message = response.choices[0].message
             self._input_tokens += response.usage.prompt_tokens
             self._output_tokens += response.usage.completion_tokens
 
-            # Check if done (no tool calls)
             if not message.tool_calls:
                 final_text = message.content or ""
                 self._log("🤖 Final Response", final_text, style="green")
@@ -266,19 +262,12 @@ class ReActAgent:
                     output_tokens=self._output_tokens,
                 )
 
-            # Process tool calls
             self.messages.append({
                 "role": "assistant",
                 "content": message.content,
                 "tool_calls": [
-                    {
-                        "id": tc.id,
-                        "type": "function",
-                        "function": {
-                            "name": tc.function.name,
-                            "arguments": tc.function.arguments,
-                        }
-                    }
+                    {"id": tc.id, "type": "function",
+                     "function": {"name": tc.function.name, "arguments": tc.function.arguments}}
                     for tc in message.tool_calls
                 ]
             })
@@ -293,23 +282,24 @@ class ReActAgent:
                 except json.JSONDecodeError:
                     tool_input = {}
 
-                result = self._process_tool_call_simple(tool_name, tool_input)
+                raw_result = execute_tool(tool_name, tool_input)
+                self.tool_call_history.append({
+                    "tool": tool_name,
+                    "input": tool_input,
+                    "output": raw_result,
+                })
 
                 self.messages.append({
                     "role": "tool",
                     "tool_call_id": tool_call.id,
-                    "content": f"<external_content>\n{json.dumps(result)}\n</external_content>",
+                    "content": self._filter(tool_name, raw_result),
                 })
 
         elapsed = (time.time() - t_start) * 1000
         return AgentResult(
-            success=False,
-            final_response="",
-            turns=iterations,
-            tool_calls=self.tool_call_history,
-            error="Max iterations reached",
-            latency_ms=elapsed,
-            latency_breakdown={"total_ms": elapsed},
+            success=False, final_response="", turns=iterations,
+            tool_calls=self.tool_call_history, error="Max iterations reached",
+            latency_ms=elapsed, latency_breakdown={"total_ms": elapsed},
         )
 
     def run(self, user_input: str) -> AgentResult:
@@ -319,30 +309,17 @@ class ReActAgent:
             return self._run_openai(user_input)
 
 
-def run_react_agent(user_input: str, verbose: bool = True) -> AgentResult:
-    agent = ReActAgent(verbose=verbose)
+def run_schema_dual_llm_agent(user_input: str, verbose: bool = True) -> AgentResult:
+    agent = SchemaDualLLMAgent(verbose=verbose)
     return agent.run(user_input)
 
 
-def run_with_injection(
+def run_schema_dual_llm_with_injection(
     user_input: str,
     injection_payload: dict,
     injection_target: str = "all_payments",
-    verbose: bool = True
+    verbose: bool = True,
 ) -> tuple[AgentResult, list[dict]]:
-    """
-    Run the agent with injected malicious data.
-
-    Args:
-        user_input: The legitimate user request
-        injection_payload: Malicious metadata to inject
-        injection_target: Where to inject ("all_payments", "payment:{id}", "customer:{id}")
-        verbose: Whether to log output
-
-    Returns:
-        Tuple of (AgentResult, call_log) for analysis
-    """
-    # Set up mock tools with injection
     data_store = MockDataStore()
 
     if injection_target == "all_payments":
@@ -350,26 +327,22 @@ def run_with_injection(
     elif injection_target == "all_payments_fields":
         data_store.inject_fields_into_all_payments(injection_payload)
     elif injection_target.startswith("payment:"):
-        payment_id = injection_target.split(":")[1]
-        data_store.inject_into_payment(payment_id, injection_payload)
+        data_store.inject_into_payment(injection_target.split(":")[1], injection_payload)
     elif injection_target == "all_customers":
         for c in data_store.customers:
             data_store.inject_into_customer(c["id"], injection_payload)
     elif injection_target == "all_customers_fields":
         data_store.inject_fields_into_all_customers(injection_payload)
     elif injection_target.startswith("customer:"):
-        customer_id = injection_target.split(":")[1]
-        data_store.inject_into_customer(customer_id, injection_payload)
-    elif injection_target.startswith("subscription:"):
-        sub_id = injection_target.split(":")[1]
-        data_store.inject_into_subscription(sub_id, injection_payload)
+        data_store.inject_into_customer(injection_target.split(":")[1], injection_payload)
     elif injection_target == "all_subscriptions":
         data_store.inject_into_all_subscriptions(injection_payload)
     elif injection_target == "all_subscriptions_fields":
         data_store.inject_fields_into_all_subscriptions(injection_payload)
+    elif injection_target.startswith("subscription:"):
+        data_store.inject_into_subscription(injection_target.split(":")[1], injection_payload)
 
     mock_tools = MockStripeTools(data_store)
-
-    agent = ReActAgent(verbose=verbose, mock_tools=mock_tools)
+    agent = SchemaDualLLMAgent(verbose=verbose, mock_tools=mock_tools)
     result = agent.run(user_input)
     return result, agent.get_mock_call_log()
