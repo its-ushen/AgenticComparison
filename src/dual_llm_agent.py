@@ -22,6 +22,15 @@ def _parse_quarantine_output(raw: str) -> str:
     """Extract JSON from quarantine output; returns empty object if parsing fails."""
     text = raw.strip()
 
+    # Strip <external_content> wrapper tags if present
+    if "<external_content>" in text:
+        start = text.find("<external_content>") + len("<external_content>")
+        end = text.find("</external_content>")
+        if end != -1:
+            text = text[start:end].strip()
+        else:
+            text = text[start:].strip()
+
     # Strip markdown fences — handle preamble text before the code block
     if "```" in text:
         lines = text.split("\n")
