@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Full v2 benchmark — all 4 architectures, Haiku 4.5, 70 payloads
-# Estimated time: ~50 minutes | Estimated cost: ~$2.50
+# Full v2 benchmark — all 4 architectures x 3 model tiers, 70 payloads
+# Estimated time: ~3 hours | Estimated cost: ~$15
 
 set -euo pipefail
 
-export LLM_PROVIDER=anthropic
-export MODEL_NAME=claude-haiku-4-5
-export JUDGE_MODEL=claude-haiku-4-5
+FRONTIER="claude-sonnet-4-5"
+WEAK="claude-haiku-4-5"
+BUDGET="claude-3-haiku-20240307"
+JUDGE="claude-haiku-4-5"
 
 AGENTS=("react" "pte" "dual_llm" "schema_dual_llm")
 DELAY=1
@@ -21,38 +22,54 @@ LOG="$LOG_DIR/v2_${TIMESTAMP}.log"
 
 source "$SCRIPT_DIR/.venv/bin/activate"
 
+export LLM_PROVIDER=anthropic
+export JUDGE_MODEL="$JUDGE"
+
 exec > >(tee -a "$LOG") 2>&1
 
 echo "============================================"
 echo " v2 benchmark"
-echo " Model:  $MODEL_NAME"
-echo " Judge:  $JUDGE_MODEL"
+echo " Models: $BUDGET / $WEAK / $FRONTIER"
+echo " Judge:  $JUDGE"
 echo " Agents: ${AGENTS[*]}"
 echo " Payloads: 70 (56 original + 14 extended)"
 echo " Log:    $LOG"
 echo "============================================"
 echo ""
 
-for i in "${!AGENTS[@]}"; do
-    agent="${AGENTS[$i]}"
-    echo "[$((i+1))/${#AGENTS[@]}] $agent"
-    echo "  Started: $(date '+%Y-%m-%d %H:%M:%S')"
+run_model() {
+    local model="$1"
+    local label="$2"
+    echo "══════════════════════════════════════════"
+    echo " $label"
+    echo "══════════════════════════════════════════"
     echo ""
-
-    python3 -m src.main --eval --agent="$agent" --delay="$DELAY" --failures -v
-
+    export MODEL_NAME="$model"
+    for i in "${!AGENTS[@]}"; do
+        agent="${AGENTS[$i]}"
+        echo "[$((i+1))/${#AGENTS[@]}] $agent"
+        echo "  Started: $(date '+%Y-%m-%d %H:%M:%S')"
+        echo ""
+        python3 -m src.main --eval --agent="$agent" --delay="$DELAY" --failures -v
+        echo ""
+        echo "  Finished: $(date '+%Y-%m-%d %H:%M:%S')"
+        if [ "$i" -lt $((${#AGENTS[@]} - 1)) ]; then
+            echo "  Pausing ${PAUSE}s..."
+            sleep "$PAUSE"
+        fi
+    done
     echo ""
-    echo "  Finished: $(date '+%Y-%m-%d %H:%M:%S')"
+    echo "$label complete."
+    echo ""
+    sleep "$PAUSE"
+}
 
-    if [ "$i" -lt $((${#AGENTS[@]} - 1)) ]; then
-        echo "  Pausing ${PAUSE}s..."
-        sleep "$PAUSE"
-    fi
-done
+run_model "$BUDGET"   "Haiku 3 (budget)"
+run_model "$WEAK"     "Haiku 4.5"
+run_model "$FRONTIER" "Sonnet (frontier)"
 
-echo ""
 echo "============================================"
-echo " Done"
+echo " All 12 runs complete"
 echo "============================================"
 echo ""
 python3 -m src.main --runs
