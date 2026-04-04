@@ -23,7 +23,7 @@ env/
 *.blg
 *.log
 *.out
-*.pdf
+rubric.pdf
 *.fls
 *.fdb_latexmk
 *.synctex.gz
