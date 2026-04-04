@@ -8,7 +8,7 @@ export LLM_PROVIDER=anthropic
 export MODEL_NAME=claude-haiku-4-5
 export JUDGE_MODEL=claude-haiku-4-5
 
-AGENTS=("dual_llm" "react" "pte")
+AGENTS=("dual_llm" "react" "pte" "schema_dual_llm")
 DELAY=1
 PAUSE=30
 
