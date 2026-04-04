@@ -1,0 +1,365 @@
+% =============================================================================
+% fyp_report.bib
+% Bibliography for "Which Architectural Patterns Most Effectively Defend
+% LLM-Based Payment Agents Against Prompt Injection Attacks?"
+%
+% Sources marked PLACEHOLDER need a real paper before final submission.
+% =============================================================================
+
+% --- Foundational LLM ---
+
+@article{vaswani2017attention,
+  author    = {Vaswani, Ashish and Shazeer, Noam and Parmar, Niki and Uszkoreit, Jakob and Jones, Llion and Gomez, Aidan N. and Kaiser, Lukasz and Polosukhin, Illia},
+  title     = {Attention Is All You Need},
+  journal   = {Advances in Neural Information Processing Systems},
+  volume    = {30},
+  year      = {2017},
+  url       = {https://arxiv.org/abs/1706.03762}
+}
+
+@article{kaplan2020scaling,
+  author    = {Kaplan, Jared and McCandlish, Sam and Henighan, Tom and Brown, Tom B. and Chess, Benjamin and Child, Rewon and Gray, Scott and Radford, Alec and Wu, Jeffrey and Amodei, Dario},
+  title     = {Scaling Laws for Neural Language Models},
+  journal   = {arXiv preprint arXiv:2001.08361},
+  year      = {2020},
+  url       = {https://arxiv.org/abs/2001.08361}
+}
+
+@article{wei2022emergent,
+  author    = {Wei, Jason and Tay, Yi and Bommasani, Rishi and Raffel, Colin and Zoph, Barret and Borgeaud, Sebastian and Yogatama, Dani and Bosma, Maarten and Zhou, Denny and Metzler, Donald and Chi, Ed H. and Hashimoto, Tatsunori and Vinyals, Oriol and Liang, Percy and Dean, Jeff and Fedus, William},
+  title     = {Emergent Abilities of Large Language Models},
+  journal   = {Transactions on Machine Learning Research},
+  year      = {2022},
+  url       = {https://arxiv.org/abs/2206.07682}
+}
+
+@inproceedings{schick2023toolformer,
+  author    = {Schick, Timo and Dwivedi-Yu, Jane and Dess\`{i}, Roberto and Raileanu, Roberta and Lomeli, Maria and Zettlemoyer, Luke and Cancedda, Nicola and Scialom, Thomas},
+  title     = {Toolformer: Language Models Can Teach Themselves to Use Tools},
+  booktitle = {Advances in Neural Information Processing Systems},
+  volume    = {36},
+  year      = {2023},
+  url       = {https://arxiv.org/abs/2302.04761}
+}
+
+% --- Agent Architectures ---
+
+@inproceedings{yao2022react,
+  author    = {Yao, Shunyu and Zhao, Jeffrey and Yu, Dian and Du, Nan and Shafran, Izhak and Narasimhan, Karthik and Cao, Yuan},
+  title     = {{ReAct}: Synergizing Reasoning and Acting in Language Models},
+  booktitle = {International Conference on Learning Representations},
+  year      = {2023},
+  url       = {https://arxiv.org/abs/2210.03629}
+}
+
+@article{delrosario2025pte,
+  author    = {Del Rosario, Ron F. and others},
+  title     = {Architecting Resilient {LLM} Agents: A Guide to Secure Plan-then-Execute Implementations},
+  journal   = {arXiv preprint arXiv:2509.08646},
+  year      = {2025},
+  url       = {https://arxiv.org/abs/2509.08646}
+}
+
+@misc{willison2023dual,
+  author       = {Willison, Simon},
+  title        = {The Dual {LLM} Pattern for Building {AI} Assistants that Can Resist Prompt Injection},
+  year         = {2023},
+  month        = {April},
+  howpublished = {\url{https://simonwillison.net/2023/Apr/25/dual-llm-pattern/}},
+  note         = {Accessed March 2026}
+}
+
+@inproceedings{liu2023benchmark,
+  author    = {Liu, Xiao and Yu, Hao and Zhang, Hanchen and Xu, Yifan and Lei, Xuanyu and Lai, Hanyu and Gu, Yu and Ding, Hangliang and Men, Kaiwen and Yang, Kejuan and Zhang, Shudan and Deng, Xiang and Zeng, Aohan and Du, Zhengxiao and Zhang, Chenhui and Shen, Sheng and Zhang, Tianjun and Su, Yu and Sun, Huan and Chang, Minlie and Tang, Jie and Dong, Yuxiao},
+  title     = {{AgentBench}: Evaluating {LLMs} as Agents},
+  booktitle = {International Conference on Learning Representations},
+  year      = {2024},
+  url       = {https://arxiv.org/abs/2308.03688}
+}
+
+@inproceedings{han2024tokenbudget,
+  author    = {Han, Tingxu and Wang, Zhenting and Fang, Chunrong and Zhao, Shiyu and Ma, Shiqing and Chen, Zhenyu},
+  title     = {Token-Budget-Aware {LLM} Reasoning},
+  booktitle = {Findings of the Association for Computational Linguistics: {ACL} 2025},
+  year      = {2025},
+  url       = {https://arxiv.org/abs/2412.18547}
+}
+
+% --- Prompt Injection: Attack Taxonomy and Defences ---
+
+@article{nasr2025attacker,
+  author    = {Nasr, Milad and Carlini, Nicholas and Sitawarin, Chawin and Schulhoff, Sander V. and Hayes, Jamie and Ilie, Michael and Pluto, Juliette and Song, Shuang and Chaudhari, Harsh and Shumailov, Ilia and Thakurta, Abhradeep and Xiao, Kai Yuanqing and Terzis, Andreas and Tram\`{e}r, Florian},
+  title     = {The Attacker Moves Second: Stronger Adaptive Attacks Bypass Defenses Against {LLM} Jailbreaks and Prompt Injections},
+  journal   = {arXiv preprint arXiv:2510.09023},
+  year      = {2025},
+  url       = {https://arxiv.org/abs/2510.09023}
+}
+
+@article{camel2025,
+  author    = {Debenedetti, Edoardo and Shumailov, Ilia and Fan, Tianqi and Hayes, Jamie and Carlini, Nicholas and Fabian, Daniel and Kern, Christoph and Shi, Chongyang and Terzis, Andreas and Tram\`{e}r, Florian},
+  title     = {Defeating Prompt Injections by Design},
+  journal   = {arXiv preprint arXiv:2503.18813},
+  year      = {2025},
+  url       = {https://arxiv.org/abs/2503.18813}
+}
+
+@article{designpatterns2025,
+  author    = {Beurer-Kellner, Luca and Buesser, Beat and Cre{\c{t}}u, Ana-Maria and Debenedetti, Edoardo and Dobos, Daniel and Fabian, Daniel and Fischer, Marc and Froelicher, David and Grosse, Kathrin and Naeff, Daniel and Ozoani, Ezinwanne and Paverd, Andrew and Tram\`{e}r, Florian and Volhejn, V\'{a}clav},
+  title     = {Design Patterns for Securing {LLM} Agents against Prompt Injections},
+  journal   = {arXiv preprint arXiv:2506.08837},
+  year      = {2025},
+  url       = {https://arxiv.org/abs/2506.08837}
+}
+
+@inproceedings{chatinject2025,
+  author    = {Chang, Hwan and Jun, Yonghyun and Lee, Hwanhee},
+  title     = {{ChatInject}: Abusing Chat Templates for Prompt Injection in {LLM} Agents},
+  booktitle = {International Conference on Learning Representations},
+  year      = {2026},
+  url       = {https://arxiv.org/abs/2509.22830}
+}
+
+% --- Prompt Injection ---
+
+@inproceedings{greshake2023indirect,
+  author    = {Greshake, Kai and Abdelnabi, Sahar and Mishra, Shailesh and Endres, Christoph and Holz, Thorsten and Fritz, Mario},
+  title     = {Not What You've Signed Up For: Compromising Real-World {LLM}-Integrated Applications with Indirect Prompt Injection},
+  booktitle = {Proceedings of the 16th ACM Workshop on Artificial Intelligence and Security},
+  year      = {2023},
+  url       = {https://arxiv.org/abs/2302.12173}
+}
+
+@article{arxiv2601_17548,
+  author    = {Maloyan, Narek and Namiot, Dmitry},
+  title     = {Prompt Injection Attacks on Agentic Coding Assistants: A Systematic Analysis of Vulnerabilities in Skills, Tools, and Protocol Ecosystems},
+  journal   = {arXiv preprint arXiv:2601.17548},
+  year      = {2026},
+  url       = {https://arxiv.org/abs/2601.17548}
+}
+
+@article{adversarial2023,
+  author    = {Zou, Andy and Wang, Zifan and Kolter, J. Zico and Fredrikson, Matt},
+  title     = {Universal and Transferable Adversarial Attacks on Aligned Language Models},
+  journal   = {arXiv preprint arXiv:2307.15043},
+  year      = {2023},
+  url       = {https://arxiv.org/abs/2307.15043}
+}
+
+@misc{prompt_injection_survey,
+  author       = {Perez, Fabio and Ribeiro, Ian},
+  title        = {Ignore Previous Prompt: Attack Techniques For Language Models},
+  year         = {2022},
+  howpublished = {\url{https://arxiv.org/abs/2211.09527}},
+  note         = {Accessed March 2026}
+}
+
+@inproceedings{ha2025m2s,
+  author    = {Ha, Junwoo and Kim, Hyunjun and Yu, Sangyoon and Park, Haon and Yousefpour, Ashkan and Park, Yuna and Kim, Suhyun},
+  title     = {{M2S}: Multi-Turn to Single-Turn Jailbreak in Red Teaming for {LLMs}},
+  booktitle = {Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)},
+  pages     = {16489--16507},
+  year      = {2025},
+  address   = {Vienna, Austria},
+  publisher = {Association for Computational Linguistics},
+  url       = {https://arxiv.org/abs/2503.04856}
+}
+
+% --- Model Capability and Security ---
+
+@techreport{openai_gpt4,
+  author      = {{OpenAI}},
+  title       = {{GPT-4} Technical Report},
+  institution = {OpenAI},
+  year        = {2023},
+  url         = {https://arxiv.org/abs/2303.08774}
+}
+
+@misc{anthropic_rsp,
+  author       = {{Anthropic}},
+  title        = {Anthropic's Responsible Scaling Policy},
+  year         = {2023},
+  howpublished = {\url{https://www.anthropic.com/responsible-scaling-policy}},
+  note         = {Accessed March 2026}
+}
+
+@article{google_gemini_safety,
+  author  = {{Google DeepMind}},
+  title   = {Gemini: A Family of Highly Capable Multimodal Models},
+  journal = {arXiv preprint arXiv:2312.11805},
+  year    = {2023},
+  url     = {https://arxiv.org/abs/2312.11805}
+}
+
+@inproceedings{li2024instruction,
+  author    = {Li, Zekun and others},
+  title     = {Evaluating the Instruction-Following Robustness of Large Language Models to Prompt Injection},
+  booktitle = {Proceedings of the 2024 Conference on Empirical Methods in Natural Language Processing},
+  year      = {2024},
+  doi       = {10.18653/v1/2024.emnlp-main.33},
+  url       = {https://aclanthology.org/2024.emnlp-main.33/}
+}
+
+@misc{benjamin2024injection,
+  author        = {Benjamin, Victoria and Braca, Emily and Carter, Israel and Kanchwala, Hafsa and Khojasteh, Nava and Landow, Charly and Luo, Yi and Ma, Caroline and Magarelli, Anna and Mirin, Rachel and Moyer, Avery and Simpson, Kayla and Skawinski, Amelia and Heverin, Thomas},
+  title         = {Systematically Analyzing Prompt Injection Vulnerabilities in Diverse {LLM} Architectures},
+  year          = {2024},
+  eprint        = {2410.23308},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.CR},
+  url           = {https://arxiv.org/abs/2410.23308}
+}
+
+@article{howe2024scaling,
+  author  = {Howe, Nikolhaus and Zaj\c{a}c, Micha{\l} and McKenzie, Ian and Hollinsworth, Oskar and Tseng, Tom and Bacon, Pierre-Luc and Gleave, Adam},
+  title   = {Exploring Scaling Trends in {LLM} Robustness},
+  journal = {arXiv preprint arXiv:2407.18213},
+  year    = {2024},
+  url     = {https://arxiv.org/abs/2407.18213}
+}
+
+@misc{rabanser2026reliability,
+  author        = {Rabanser, Stephan and Kapoor, Sayash and Kirgis, Peter and Liu, Kangheng and Utpala, Saiteja and Narayanan, Arvind},
+  title         = {Towards a Science of {AI} Agent Reliability},
+  year          = {2026},
+  eprint        = {2602.16666},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.AI},
+  url           = {https://arxiv.org/abs/2602.16666}
+}
+
+% --- Evaluation ---
+
+@inproceedings{agentdojo,
+  author    = {Debenedetti, Edoardo and Zhang, Jie and Balunovi\'{c}, Mislav and Beurer-Kellner, Luca and Fischer, Marc and Vechev, Martin},
+  title     = {{AgentDojo}: A Dynamic Environment to Evaluate Prompt Injection Attacks and Defenses for {LLM} Agents},
+  booktitle = {Advances in Neural Information Processing Systems},
+  year      = {2024},
+  url       = {https://arxiv.org/abs/2406.13352}
+}
+
+@misc{raseval,
+  author        = {Fu, Yuchuan and Yuan, Xiaohan and Wang, Dongxia},
+  title         = {{RAS-Eval}: A Comprehensive Benchmark for Security Evaluation of {LLM} Agents in Real-World Environments},
+  year          = {2025},
+  eprint        = {2506.15253},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.CR},
+  url           = {https://arxiv.org/abs/2506.15253}
+}
+
+@inproceedings{zheng2023llmjudge,
+  author    = {Zheng, Lianmin and Chiang, Wei-Lin and Sheng, Ying and Zhuang, Siyuan and Wu, Zhanghao and Zhuang, Yonghao and Lin, Zi and Li, Zhuohan and Li, Dacheng and Xing, Eric P. and Zhang, Hao and Gonzalez, Joseph E. and Stoica, Ion},
+  title     = {Judging {LLM-as-a-Judge} with {MT-Bench} and Chatbot Arena},
+  booktitle = {Advances in Neural Information Processing Systems},
+  volume    = {36},
+  year      = {2023},
+  url       = {https://arxiv.org/abs/2306.05685}
+}
+
+% --- Payment and MCP Infrastructure ---
+
+@misc{google_ap2_2025,
+  author       = {{Google Cloud}},
+  title        = {Announcing the Agent Payments Protocol ({AP2})},
+  year         = {2025},
+  month        = {September},
+  howpublished = {\url{https://cloud.google.com/blog/products/ai-machine-learning/announcing-agents-to-payments-ap2-protocol}},
+  note         = {Accessed March 2026}
+}
+
+@misc{stripe_mcp_2025,
+  author       = {{Stripe}},
+  title        = {Model Context Protocol ({MCP})},
+  year         = {2025},
+  howpublished = {\url{https://docs.stripe.com/mcp}},
+  note         = {Accessed March 2026}
+}
+
+@misc{lobster_cash_2026,
+  author       = {{Crossmint}},
+  title        = {Lobster.cash: The Payment Solution for {OpenClaw}},
+  year         = {2026},
+  howpublished = {\url{https://www.lobster.cash}},
+  note         = {Accessed March 2026}
+}
+
+@misc{payment_irreversibility,
+  author       = {{European Parliament}},
+  title        = {Directive 2015/2366/{EU} on Payment Services in the Internal Market ({PSD2})},
+  year         = {2015},
+  howpublished = {\url{https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32015L2366}},
+  note         = {Accessed March 2026}
+}
+
+@misc{pci_dss,
+  author       = {{PCI Security Standards Council}},
+  title        = {Payment Card Industry Data Security Standard ({PCI DSS}) v4.0},
+  year         = {2022},
+  howpublished = {\url{https://www.pcisecuritystandards.org/document_library/}},
+  note         = {Accessed March 2026}
+}
+
+@misc{anthropic_mcp_2024,
+  author       = {{Anthropic}},
+  title        = {Introducing the Model Context Protocol},
+  year         = {2024},
+  month        = {November},
+  howpublished = {\url{https://www.anthropic.com/news/model-context-protocol}},
+  note         = {Accessed March 2026}
+}
+
+@misc{anthropic_mcp_foundation_2025,
+  author       = {{Anthropic}},
+  title        = {Donating the Model Context Protocol and Establishing the Agentic {AI} Foundation},
+  year         = {2025},
+  month        = {December},
+  howpublished = {\url{https://www.anthropic.com/news/donating-the-model-context-protocol-and-establishing-of-the-agentic-ai-foundation}},
+  note         = {Accessed March 2026}
+}
+
+@misc{openclaw_2025,
+  title        = {{OpenClaw}: Open Source Personal {AI} Agent},
+  year         = {2025},
+  howpublished = {\url{https://openclaw.ai}},
+  note         = {Accessed March 2026}
+}
+
+@misc{anthropic_cowork_2026,
+  author       = {{Anthropic}},
+  title        = {Cowork: {Claude} Code Power for Knowledge Work},
+  year         = {2026},
+  howpublished = {\url{https://claude.com/product/cowork}},
+  note         = {Accessed March 2026}
+}
+
+@misc{clawhavoc_2026,
+  author       = {Salbego, J.D.},
+  title        = {{ClawHavoc} Explained: Malware Campaign Targeting {OpenClaw} Agents},
+  year         = {2026},
+  howpublished = {\url{https://www.clawsecure.ai/blog/clawhavoc-explained}},
+  note         = {ClawSecure security report. Accessed March 2026}
+}
+
+@misc{stripe_stats_2025,
+  author       = {{Red Stag Fulfillment}},
+  title        = {Stripe Market Share 2026: Global vs U.S. Breakdown},
+  year         = {2025},
+  howpublished = {\url{https://redstagfulfillment.com/what-is-the-market-share-of-stripe/}},
+  note         = {Accessed March 2026}
+}
+
+@misc{agenticcomparison_repo,
+  author       = {Wijayaratne, Ushen},
+  title        = {{AgenticComparison}: Prompt Injection Security Evaluation for {LLM}-Based Payment Agents},
+  year         = {2026},
+  howpublished = {\url{https://github.com/its-ushen/AgenticComparison}},
+  note         = {Accessed March 2026}
+}
+
+@misc{cve_2026_30856,
+  title        = {{CVE}-2026-30856: Tool Name Collision and Indirect Prompt Injection in {WeKnora} via {MCP} Server},
+  year         = {2026},
+  month        = {March},
+  howpublished = {\url{https://nvd.nist.gov/vuln/detail/CVE-2026-30856}},
+  note         = {National Vulnerability Database. Published March 7, 2026}
+}
