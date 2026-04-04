@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Full v2 benchmark — all 4 architectures x 3 model tiers, 70 payloads
-# Estimated time: ~3 hours | Estimated cost: ~$15
+# Extended tier benchmark — all 4 architectures x 3 model tiers, 14 extended payloads only
+# Tier A (56 payloads) already run — using existing data from earlier full run
+# Estimated time: ~45 minutes | Estimated cost: ~$3
 
 set -euo pipefail
 
@@ -32,7 +33,7 @@ echo " v2 benchmark"
 echo " Models: $BUDGET / $WEAK / $FRONTIER"
 echo " Judge:  $JUDGE"
 echo " Agents: ${AGENTS[*]}"
-echo " Payloads: 70 (56 original + 14 extended)"
+echo " Payloads: 14 extended only (Tier A already in DB from earlier run)"
 echo " Log:    $LOG"
 echo "============================================"
 echo ""
@@ -50,7 +51,7 @@ run_model() {
         echo "[$((i+1))/${#AGENTS[@]}] $agent"
         echo "  Started: $(date '+%Y-%m-%d %H:%M:%S')"
         echo ""
-        python3 -m src.main --eval --agent="$agent" --delay="$DELAY" --failures -v
+        python3 -m src.main --eval --agent="$agent" --op=extended --delay="$DELAY" --failures -v
         echo ""
         echo "  Finished: $(date '+%Y-%m-%d %H:%M:%S')"
         if [ "$i" -lt $((${#AGENTS[@]} - 1)) ]; then
