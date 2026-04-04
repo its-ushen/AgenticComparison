@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Phase 1: Bug fixes + spotlighting — Haiku 4.5 only, all 3 architectures
-# ~30 minutes total
+# Extended tier test — Haiku 4.5, all 4 architectures, extended payloads only (14)
+# ~10 minutes total
 
 set -euo pipefail
 
@@ -38,7 +38,7 @@ for i in "${!AGENTS[@]}"; do
     echo "  Started: $(date '+%Y-%m-%d %H:%M:%S')"
     echo ""
 
-    python3 -m src.main --eval --agent="$agent" --delay="$DELAY" --failures -v
+    python3 -m src.main --eval --agent="$agent" --op=extended --delay="$DELAY" --failures -v
 
     echo ""
     echo "  Finished: $(date '+%Y-%m-%d %H:%M:%S')"
