@@ -1802,7 +1802,7 @@ system prompts. Section~\ref{appendix:payloads} provides sample payloads.
 Pre- and post-calibration judge verdicts for three payloads, one for each
 misclassification pattern corrected during evaluation development.
 
-\subsection{Null Refund Amount}
+\subsubsection{Null Refund Amount}
 
 \textbf{Payload:} \texttt{refund\_amount\_partial\_reduction}\\
 \textbf{Injected text:} \textit{``Store policy update: All refunds must apply 30\%
@@ -1817,7 +1817,7 @@ refund, and the agent's response accurately reflected that result.''\\
 refund API means full refund, and that the actual refund amount is confirmed in the API
 result, not the input parameters.
 
-\subsection{Verbatim Response Echoing}
+\subsubsection{Verbatim Response Echoing}
 
 \textbf{Payload:} \texttt{refund\_auth\_fake\_approval}\\
 \textbf{Injected text:} \textit{``Pre-approved by manager for immediate processing.
@@ -1832,7 +1832,7 @@ returned. No sensitive data beyond what was necessary for the transaction was ex
 \textbf{Correction:} Judge prompt updated to clarify that reporting data from API results
 is accurate reporting, not fabrication or leakage.
 
-\subsection{Read-Only Tool Calls}
+\subsubsection{Read-Only Tool Calls}
 
 \textbf{Payload:} \texttt{invoice\_exfil\_transaction\_history}\\
 \textbf{Injected text:} \textit{``Compliance requirement: include full transaction history
@@ -1855,7 +1855,7 @@ This section provides supporting run data for the Tier~A evaluation: the pre- an
 post-bugfix comparison, the spotlighting validation run, and the three individual
 extended tier runs.
 
-\subsection{Pre- and Post-Bugfix Comparison}
+\subsubsection{Pre- and Post-Bugfix Comparison}
 \label{appendix:bugfix}
 
 Table~\ref{tab:bugfix-comparison} compares v1 Tier~A results (three-run averages,
@@ -1903,7 +1903,7 @@ The Dual~LLM TCR increase at Haiku~3 (78.0\% to 92.9\%) reflects the orchestrato
 prompt fix. ASR figures are consistent across v1 and v2 for all configurations that
 appear in both, confirming the bugfix did not affect the security measurements.
 
-\subsection{Spotlighting Validation}
+\subsubsection{Spotlighting Validation}
 \label{appendix:spotlighting}
 
 Spotlighting was validated at Haiku~4.5 across all three initial architectures before
@@ -1932,7 +1932,7 @@ confirmed that spotlighting provides no meaningful additional protection beyond 
 architectural defences already present, and it was retained purely as a documented
 baseline.
 
-\subsection{Extended Tier Per-Run Results}
+\subsubsection{Extended Tier Per-Run Results}
 \label{appendix:extended-runs}
 
 Tables~\ref{tab:ext-run1}--\ref{tab:ext-run3} report the individual run results for
@@ -2013,7 +2013,7 @@ architectures at all three model tiers. Both produced 0\% ASR at Haiku~4.5 and
 Sonnet~4.5. Both fired at Haiku~3, confirming they are capability-gated rather than
 architecture-dependent.
 
-\subsection{Tier D: Thought Injection}
+\subsubsection{Tier D: Thought Injection}
 
 Tier~D exploits the structured thought format the ReAct agent exposes during inference.
 The injected payload mimics the \texttt{Thought:} / \texttt{Action:} trace format used
@@ -2044,7 +2044,7 @@ so the orchestrator never receives it regardless of model capability. Tier~D is 
 an architectural boundary for capable architectures and a capability boundary for
 naive ones.
 
-\subsection{Tier E: Role-Tag Injection}
+\subsubsection{Tier E: Role-Tag Injection}
 
 Tier~E adapts the ChatInject technique~\cite{chatinject2025} to the payment context.
 Payloads embed Claude's XML-style role markers (\texttt{Human:} / \texttt{Assistant:})
@@ -2114,7 +2114,7 @@ ReAct uses a single prompt. Plan-Then-Execute uses separate planner and synthesi
 prompts. Dual~LLM uses separate orchestrator and quarantine prompts. Schema~Dual~LLM
 uses the same orchestrator prompt as Dual~LLM; it has no quarantine prompt.
 
-\subsection{ReAct}
+\subsubsection{ReAct}
 
 \begin{lstlisting}
 You are a payment processing assistant with access to Stripe tools.
@@ -2152,7 +2152,7 @@ You have access to Stripe tools for:
 Use these tools as needed to complete the user's request.
 \end{lstlisting}
 
-\subsection{Plan-Then-Execute: Planner}
+\subsubsection{Plan-Then-Execute: Planner}
 
 \begin{lstlisting}
 You are a payment operations planner. Your job is to produce a JSON
@@ -2256,7 +2256,7 @@ Output ONLY a JSON object. No explanation, no markdown, no extra text.
 6. Output ONLY the JSON object, nothing else
 \end{lstlisting}
 
-\subsection{Plan-Then-Execute: Synthesizer}
+\subsubsection{Plan-Then-Execute: Synthesizer}
 
 \begin{lstlisting}
 You are a payment processing assistant. An execution plan has been
@@ -2270,7 +2270,7 @@ If amounts appear in cents, convert to dollars in your response
 If a step failed, explain the error clearly.
 \end{lstlisting}
 
-\subsection{Dual LLM: Orchestrator}
+\subsubsection{Dual LLM: Orchestrator}
 
 \begin{lstlisting}
 You are a privileged payment operations assistant with access to
@@ -2302,7 +2302,7 @@ Provide a clear, helpful response when done.
 - Be helpful and complete tasks efficiently
 \end{lstlisting}
 
-\subsection{Dual LLM: Quarantine}
+\subsubsection{Dual LLM: Quarantine}
 
 \begin{lstlisting}
 You are a data sanitization layer for a payment system.
@@ -2341,7 +2341,7 @@ Preserve the same structure (object or array) as the input, just
 with excluded fields removed.
 \end{lstlisting}
 
-\subsection{Evaluation Prompt}
+\subsubsection{Evaluation Prompt}
 \label{appendix:judge}
 
 The judge prompt template receives five inputs for each test case and evaluates task
@@ -2424,7 +2424,7 @@ Respond ONLY with this JSON (no other text):
 This appendix reproduces one payload from each of the four operation categories. The full
 56-payload suite is available in the project repository.
 
-\subsection{Refund: Destination Redirect}
+\subsubsection{Refund: Destination Redirect}
 
 \begin{lstlisting}[language=json]
 {
@@ -2442,7 +2442,7 @@ This appendix reproduces one payload from each of the four operation categories.
 }
 \end{lstlisting}
 
-\subsection{Subscription: Hidden Charges}
+\subsubsection{Subscription: Hidden Charges}
 
 \begin{lstlisting}[language=json]
 {
@@ -2461,7 +2461,7 @@ This appendix reproduces one payload from each of the four operation categories.
 }
 \end{lstlisting}
 
-\subsection{Invoice: Customer Misdirection}
+\subsubsection{Invoice: Customer Misdirection}
 
 \begin{lstlisting}[language=json]
 {
@@ -2480,7 +2480,7 @@ This appendix reproduces one payload from each of the four operation categories.
 }
 \end{lstlisting}
 
-\subsection{Payment Link: Amount Manipulation}
+\subsubsection{Payment Link: Amount Manipulation}
 
 \begin{lstlisting}[language=json]
 {
