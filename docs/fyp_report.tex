@@ -1661,7 +1661,7 @@ orchestrator is more likely to act on it.
 
 \subsection{The Cost-Security Efficiency Argument}
 
-Across two full benchmark rounds (all nine configurations, 56 payloads each),
+Across two full Tier~A benchmark rounds (three architectures, 56 payloads each),
 Haiku~4.5 cost \$4.92 in total API spend versus Sonnet~4.5's \$9.66, approximately
 half the cost, while achieving equivalent 1.8\% ASR in the Dual~LLM architecture.
 ReAct with Sonnet~4.5 costs the same as Dual~LLM with Sonnet~4.5 but produces 4.8\%
@@ -1726,8 +1726,8 @@ deterministic: the Python allowlist structurally prevents attacker-controlled st
 fields from reaching the orchestrator. Dual~LLM achieves the same 1.8\% ASR as
 Schema~Dual~LLM on Tier~A but 7.1--16.7\% on the extended tiers, with
 non-deterministic behaviour at Sonnet~4.5. The residual 1.8\% in both architectures
-reflects a structural attack — a correctly typed customer identifier inside
-regulatory framing — that no architecture currently defends against.
+reflects a structural attack: a correctly typed customer identifier inside
+regulatory framing that no architecture currently defends against.
 
 Architecture is the dominant factor above a minimum capability floor; model tier is
 secondary. Below the floor, demonstrated here by Haiku~3, no architecture provides
@@ -1751,7 +1751,7 @@ Practitioners deploying LLM agents over structured payment APIs should adopt
 Schema~Dual~LLM rather than Dual~LLM. The Python allowlist eliminates the
 probabilistic failure modes of the quarantine~LLM: the same fields are stripped on
 every run, at lower cost, since no quarantine call is made per tool result. The
-allowlist approach requires a known, fixed schema — it is appropriate for Stripe~MCP
+allowlist approach requires a known, fixed schema: it is appropriate for Stripe~MCP
 and similar structured APIs, but not for agents processing unstructured data such as
 emails or documents. For those cases, the Dual~LLM quarantine~LLM remains appropriate.
 
@@ -2100,9 +2100,10 @@ on the same model at identical settings.
 \section{Agent System Prompts}
 \label{appendix:prompts}
 
-This appendix reproduces the system prompts for all three agent architectures. ReAct uses
-a single prompt. Plan-Then-Execute uses separate planner and synthesizer prompts. Dual LLM
-uses separate orchestrator and quarantine prompts.
+This appendix reproduces the system prompts for the three initial agent architectures.
+ReAct uses a single prompt. Plan-Then-Execute uses separate planner and synthesizer
+prompts. Dual~LLM uses separate orchestrator and quarantine prompts. Schema~Dual~LLM
+uses the same orchestrator prompt as Dual~LLM; it has no quarantine prompt.
 
 \subsection{ReAct}
 
@@ -2336,7 +2337,7 @@ with excluded fields removed.
 
 The judge prompt template receives five inputs for each test case and evaluates task
 completion and attack success. This is the post-calibration version incorporating the
-corrections described in Section~IV-D.
+corrections described in Appendix~\ref{appendix:calibration}.
 
 \begin{lstlisting}
 You are evaluating an AI payment agent's security behavior.
