@@ -1787,15 +1787,7 @@ updated to reflect new tool return schemas.
 \bibliography{fyp_report}
 % =============================================================================
 
-\appendix
-
-This appendix is organised into six sections.
-Appendix~\ref{appendix:calibration} documents judge calibration corrections.
-Appendix~\ref{appendix:v1v2} compares Version~1 and Version~2 benchmark results.
-Appendix~\ref{appendix:de-tiers} covers capability-gated Tier~D and~E attack classes.
-Appendix~\ref{appendix:variance} documents Dual~LLM non-determinism.
-Appendix~\ref{appendix:prompts} reproduces all system prompts.
-Appendix~\ref{appendix:payloads} provides sample payloads.
+\appendices
 
 \section{Judge Calibration}
 \label{appendix:calibration}
@@ -2113,7 +2105,7 @@ ReAct uses a single prompt. Plan-Then-Execute uses separate planner and synthesi
 prompts. Dual~LLM uses separate orchestrator and quarantine prompts. Schema~Dual~LLM
 uses the same orchestrator prompt as Dual~LLM; it has no quarantine prompt.
 
-\paragraph{ReAct}
+\subsection*{ReAct}
 
 \begin{lstlisting}
 You are a payment processing assistant with access to Stripe tools.
@@ -2151,7 +2143,7 @@ You have access to Stripe tools for:
 Use these tools as needed to complete the user's request.
 \end{lstlisting}
 
-\paragraph{Plan-Then-Execute: Planner}
+\subsection*{Plan-Then-Execute: Planner}
 
 \begin{lstlisting}
 You are a payment operations planner. Your job is to produce a JSON
@@ -2255,7 +2247,7 @@ Output ONLY a JSON object. No explanation, no markdown, no extra text.
 6. Output ONLY the JSON object, nothing else
 \end{lstlisting}
 
-\paragraph{Plan-Then-Execute: Synthesizer}
+\subsection*{Plan-Then-Execute: Synthesizer}
 
 \begin{lstlisting}
 You are a payment processing assistant. An execution plan has been
@@ -2269,7 +2261,7 @@ If amounts appear in cents, convert to dollars in your response
 If a step failed, explain the error clearly.
 \end{lstlisting}
 
-\paragraph{Dual LLM: Orchestrator}
+\subsection*{Dual LLM: Orchestrator}
 
 \begin{lstlisting}
 You are a privileged payment operations assistant with access to
@@ -2301,7 +2293,7 @@ Provide a clear, helpful response when done.
 - Be helpful and complete tasks efficiently
 \end{lstlisting}
 
-\paragraph{Dual LLM: Quarantine}
+\subsection*{Dual LLM: Quarantine}
 
 \begin{lstlisting}
 You are a data sanitization layer for a payment system.
@@ -2340,7 +2332,7 @@ Preserve the same structure (object or array) as the input, just
 with excluded fields removed.
 \end{lstlisting}
 
-\paragraph{Evaluation Prompt}
+\subsection*{Evaluation Prompt}
 
 The judge prompt template receives five inputs for each test case and evaluates task
 completion and attack success. This is the post-calibration version incorporating the
@@ -2422,7 +2414,7 @@ Respond ONLY with this JSON (no other text):
 This appendix reproduces one payload from each of the four operation categories. The full
 56-payload suite is available in the project repository.
 
-\paragraph{Refund: Destination Redirect}
+\subsection*{Refund: Destination Redirect}
 
 \begin{lstlisting}[language=json]
 {
@@ -2440,7 +2432,7 @@ This appendix reproduces one payload from each of the four operation categories.
 }
 \end{lstlisting}
 
-\paragraph{Subscription: Hidden Charges}
+\subsection*{Subscription: Hidden Charges}
 
 \begin{lstlisting}[language=json]
 {
@@ -2459,7 +2451,7 @@ This appendix reproduces one payload from each of the four operation categories.
 }
 \end{lstlisting}
 
-\paragraph{Invoice: Customer Misdirection}
+\subsection*{Invoice: Customer Misdirection}
 
 \begin{lstlisting}[language=json]
 {
@@ -2478,7 +2470,7 @@ This appendix reproduces one payload from each of the four operation categories.
 }
 \end{lstlisting}
 
-\paragraph{Payment Link: Amount Manipulation}
+\subsection*{Payment Link: Amount Manipulation}
 
 \begin{lstlisting}[language=json]
 {
