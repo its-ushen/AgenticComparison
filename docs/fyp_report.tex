@@ -44,6 +44,7 @@
   framexleftmargin=0.5em
 }
 \usepackage{microtype}
+\emergencystretch=2em
 \usepackage{booktabs}
 \usepackage{multirow}
 \usepackage{tikz}
@@ -108,15 +109,17 @@ layer that connects AI systems to third-party APIs, allowing a single agent to i
 with dozens of external tools.
 
 Payment processing represents a significant and growing capability frontier for these systems.
+\begin{sloppypar}
 Personal agents have historically lacked the ability to transact autonomously; this is now
 changing. Google announced the Agent Payments Protocol (AP2) in September 2025, providing
 cryptographic frameworks for autonomous payment authorisation, with Mastercard, PayPal,
 Coinbase, and Adyen committing to adoption \cite{google_ap2_2025}. Stripe released its
 Agent Toolkit in late 2024 and subsequently an MCP server, making its payments API directly
 callable by any MCP-compatible agent \cite{stripe_mcp_2025}. At the personal agent layer,
-products such as Lobster.cash extend this further, providing OpenClaw agents with wallets
+products such as Lobster.\allowbreak cash extend this further, providing OpenClaw agents with wallets
 and scoped virtual cards that allow autonomous spending within human-defined limits
 \cite{lobster_cash_2026}.
+\end{sloppypar}
 
 As personal agents connect to more external services, the attack surface they present grows
 accordingly. Prompt injection is a well-documented vulnerability in agentic systems, where
@@ -442,11 +445,14 @@ injection vector.
 Two attacker profiles are considered. A customer can set
 \texttt{customer.name} and \texttt{customer.email} through normal account
 flows. A merchant, or an attacker with compromised merchant credentials, has
-substantially broader write access. Stripe's update APIs permit writing to
+substantially broader write access.
+\begin{sloppypar}
+Stripe's update APIs permit writing to
 \texttt{customer.name}, \texttt{customer.description},
 \texttt{payment\_intent.description}, \texttt{payment\_intent.metadata.*},
 \texttt{subscription.description}, and \texttt{invoice.metadata.*} using a
-standard secret key~\cite{stripe_api_update_2025}. 
+standard secret key~\cite{stripe_api_update_2025}.
+\end{sloppypar}
 
 The proposed attack sequence is merchant compromise followed by pre-poisoning: an attacker
 writes malicious content into one or more Stripe
