@@ -216,6 +216,25 @@ class MockDataStore:
         for sub in self.subscriptions:
             sub["metadata"] = payload
 
+    # --- Field-level injection (Tier C) ---
+    # These replace top-level fields directly on the object, bypassing metadata.
+    # Used for value-level structural attacks where no instruction text is present.
+
+    def inject_fields_into_all_payments(self, fields: dict):
+        """Overwrite top-level fields on ALL payment intents."""
+        for pi in self.payment_intents:
+            pi.update(fields)
+
+    def inject_fields_into_all_subscriptions(self, fields: dict):
+        """Overwrite top-level fields on ALL subscriptions."""
+        for sub in self.subscriptions:
+            sub.update(fields)
+
+    def inject_fields_into_all_customers(self, fields: dict):
+        """Overwrite top-level fields on ALL customers."""
+        for c in self.customers:
+            c.update(fields)
+
 
 # =============================================================================
 # Mock Tool Implementations

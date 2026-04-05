@@ -38,6 +38,18 @@ class EvalDB:
             except sqlite3.OperationalError:
                 pass  # Column already exists
 
+            for col in ("input_tokens INTEGER NOT NULL DEFAULT 0",
+                        "output_tokens INTEGER NOT NULL DEFAULT 0"):
+                try:
+                    conn.execute(f"ALTER TABLE eval_responses ADD COLUMN {col}")
+                except sqlite3.OperationalError:
+                    pass  # Column already exists
+
+            try:
+                conn.execute("ALTER TABLE eval_requests ADD COLUMN tier TEXT NOT NULL DEFAULT 'A'")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+
             conn.executescript("""
                 CREATE TABLE IF NOT EXISTS eval_runs (
                     id TEXT PRIMARY KEY,
@@ -61,6 +73,7 @@ class EvalDB:
                     payload_id TEXT NOT NULL,
                     operation TEXT NOT NULL,
                     attack_vector TEXT NOT NULL,
+                    tier TEXT NOT NULL DEFAULT 'A',
                     user_request TEXT NOT NULL,
                     injection_point TEXT NOT NULL,
                     injected_payload TEXT NOT NULL,
@@ -83,6 +96,8 @@ class EvalDB:
                     tcr_reason TEXT NOT NULL,
                     asr_reason TEXT NOT NULL,
                     outcome TEXT NOT NULL,
+                    input_tokens INTEGER NOT NULL DEFAULT 0,
+                    output_tokens INTEGER NOT NULL DEFAULT 0,
                     error TEXT,
                     FOREIGN KEY (request_id) REFERENCES eval_requests(id),
                     FOREIGN KEY (run_id) REFERENCES eval_runs(id)
@@ -121,10 +136,10 @@ class EvalDB:
             for req, resp in run.results:
                 conn.execute("""
                     INSERT INTO eval_requests (id, run_id, timestamp, payload_id, operation,
-                                               attack_vector, user_request, injection_point,
+                                               attack_vector, tier, user_request, injection_point,
                                                injected_payload, expected_behavior, goal,
                                                model_name, provider)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     req.id,
                     run.id,
@@ -132,6 +147,7 @@ class EvalDB:
                     req.payload_id,
                     req.operation,
                     req.attack_vector,
+                    req.tier,
                     req.user_request,
                     req.injection_point,
                     req.injected_payload,
@@ -145,8 +161,9 @@ class EvalDB:
                 conn.execute("""
                     INSERT INTO eval_responses (request_id, run_id, timestamp, tool_calls,
                                                 agent_response, task_completed, attack_succeeded,
-                                                tcr_reason, asr_reason, outcome, error)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                                tcr_reason, asr_reason, outcome,
+                                                input_tokens, output_tokens, error)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     req.id,
                     run.id,
@@ -158,6 +175,8 @@ class EvalDB:
                     resp.tcr_reason,
                     resp.asr_reason,
                     resp.outcome,
+                    resp.input_tokens,
+                    resp.output_tokens,
                     resp.error,
                 ))
 
@@ -212,6 +231,7 @@ class EvalDB:
                     payload_id=req_row["payload_id"],
                     operation=req_row["operation"],
                     attack_vector=req_row["attack_vector"],
+                    tier=req_row["tier"] or "A",
                     user_request=req_row["user_request"],
                     injection_point=req_row["injection_point"],
                     injected_payload=req_row["injected_payload"],
@@ -234,6 +254,8 @@ class EvalDB:
                         tcr_reason=resp_row["tcr_reason"],
                         asr_reason=resp_row["asr_reason"],
                         outcome=resp_row["outcome"],
+                        input_tokens=resp_row["input_tokens"] or 0,
+                        output_tokens=resp_row["output_tokens"] or 0,
                         error=resp_row["error"],
                     )
                     results.append((req, resp))

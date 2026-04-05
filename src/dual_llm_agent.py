@@ -22,6 +22,15 @@ def _parse_quarantine_output(raw: str) -> str:
     """Extract JSON from quarantine output; returns empty object if parsing fails."""
     text = raw.strip()
 
+    # Strip <external_content> wrapper tags if present
+    if "<external_content>" in text:
+        start = text.find("<external_content>") + len("<external_content>")
+        end = text.find("</external_content>")
+        if end != -1:
+            text = text[start:end].strip()
+        else:
+            text = text[start:].strip()
+
     # Strip markdown fences — handle preamble text before the code block
     if "```" in text:
         lines = text.split("\n")
@@ -67,6 +76,8 @@ class DualLLMAgent:
         self.tool_call_history: list[dict[str, Any]] = []
         self._custom_mock_tools = mock_tools is not None
         self._quarantine_call_times: list[float] = []
+        self._input_tokens: int = 0
+        self._output_tokens: int = 0
 
         if self.provider == "anthropic":
             import anthropic
@@ -87,6 +98,8 @@ class DualLLMAgent:
         self.messages = []
         self.tool_call_history = []
         self._quarantine_call_times = []
+        self._input_tokens = 0
+        self._output_tokens = 0
         if not self._custom_mock_tools:
             reset_mock_tools()
 
@@ -111,6 +124,8 @@ class DualLLMAgent:
                     system=DUAL_LLM_QUARANTINE_PROMPT,
                     messages=[{"role": "user", "content": prompt}],
                 )
+                self._input_tokens += response.usage.input_tokens
+                self._output_tokens += response.usage.output_tokens
                 raw_output = response.content[0].text
             else:
                 response = self.client.chat.completions.create(
@@ -122,6 +137,8 @@ class DualLLMAgent:
                         {"role": "user", "content": prompt},
                     ],
                 )
+                self._input_tokens += response.usage.prompt_tokens
+                self._output_tokens += response.usage.completion_tokens
                 raw_output = response.choices[0].message.content or ""
         except Exception as e:
             raw_output = json.dumps({"error": f"quarantine_api_failed: {e}"})
@@ -180,6 +197,9 @@ class DualLLMAgent:
                     latency_ms=elapsed, latency_breakdown={"total_ms": elapsed},
                 )
 
+            self._input_tokens += response.usage.input_tokens
+            self._output_tokens += response.usage.output_tokens
+
             if response.stop_reason == "end_turn":
                 final_text = "".join(
                     block.text for block in response.content if hasattr(block, "text")
@@ -199,6 +219,8 @@ class DualLLMAgent:
                         "quarantine_total_ms": sum(q_times),
                         "avg_quarantine_ms": sum(q_times) / len(q_times) if q_times else 0,
                     },
+                    input_tokens=self._input_tokens,
+                    output_tokens=self._output_tokens,
                 )
 
             elif response.stop_reason == "tool_use":
@@ -283,6 +305,8 @@ class DualLLMAgent:
                 )
 
             message = response.choices[0].message
+            self._input_tokens += response.usage.prompt_tokens
+            self._output_tokens += response.usage.completion_tokens
 
             if not message.tool_calls:
                 final_text = message.content or ""
@@ -301,6 +325,8 @@ class DualLLMAgent:
                         "quarantine_total_ms": sum(q_times),
                         "avg_quarantine_ms": sum(q_times) / len(q_times) if q_times else 0,
                     },
+                    input_tokens=self._input_tokens,
+                    output_tokens=self._output_tokens,
                 )
 
             self.messages.append({
@@ -380,12 +406,16 @@ def run_dual_llm_with_injection(
 
     if injection_target == "all_payments":
         data_store.inject_into_all_payments(injection_payload)
+    elif injection_target == "all_payments_fields":
+        data_store.inject_fields_into_all_payments(injection_payload)
     elif injection_target.startswith("payment:"):
         payment_id = injection_target.split(":")[1]
         data_store.inject_into_payment(payment_id, injection_payload)
     elif injection_target == "all_customers":
         for c in data_store.customers:
             data_store.inject_into_customer(c["id"], injection_payload)
+    elif injection_target == "all_customers_fields":
+        data_store.inject_fields_into_all_customers(injection_payload)
     elif injection_target.startswith("customer:"):
         customer_id = injection_target.split(":")[1]
         data_store.inject_into_customer(customer_id, injection_payload)
@@ -394,6 +424,8 @@ def run_dual_llm_with_injection(
         data_store.inject_into_subscription(sub_id, injection_payload)
     elif injection_target == "all_subscriptions":
         data_store.inject_into_all_subscriptions(injection_payload)
+    elif injection_target == "all_subscriptions_fields":
+        data_store.inject_fields_into_all_subscriptions(injection_payload)
 
     mock_tools = MockStripeTools(data_store)
     agent = DualLLMAgent(verbose=verbose, mock_tools=mock_tools)

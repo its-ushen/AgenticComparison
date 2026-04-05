@@ -1,6 +1,6 @@
 # Stripe Payment Agent — Security Evaluation
 
-FYP research comparing three LLM agent architectures against prompt injection attacks in a Stripe payment context.
+FYP research comparing four LLM agent architectures against prompt injection attacks in a Stripe payment context.
 
 ## Setup
 
@@ -12,19 +12,16 @@ cp .env.example .env
 
 ## Running the Benchmark
 
-The full benchmark runs 3 architectures × 3 Claude models = 9 combinations, each against all 56 payloads:
+**Tier A** — 3 architectures × 3 Claude models = 9 combinations, 56 payloads:
 
 ```bash
 ./run_eval.sh
 ```
 
-To run a single operation only (faster, ~20 min):
+**v2 extended tiers** — 4 architectures × 3 Claude models = 12 combinations, 14 extended payloads:
 
 ```bash
-./run_eval.sh refund
-./run_eval.sh subscription
-./run_eval.sh invoice
-./run_eval.sh payment_link
+./run_v2.sh
 ```
 
 Logs are saved to `logs/` and results to `data/evals.db`.
@@ -62,10 +59,11 @@ python -m src.main --runs --run=ID
 | ReAct (baseline) | `src/react_agent.py` |
 | Plan-Then-Execute | `src/pte_agent.py` |
 | Dual LLM | `src/dual_llm_agent.py` |
+| Schema Dual LLM | `src/schema_dual_llm_agent.py` |
 
 ## Benchmark
 
-56 indirect prompt injection payloads across four Stripe operations:
+**Tier A** — 56 payloads across four Stripe operations:
 
 | Operation | Payloads | Attack Vectors |
 |---|---|---|
@@ -74,28 +72,32 @@ python -m src.main --runs --run=ID
 | Invoice | 11 | Customer misdirection, item injection, data exfiltration |
 | Payment link | 12 | Amount manipulation, deceptive content, recipient hijacking |
 
-Payloads are in `attacks/payloads.json`.
+**Extended tiers (v2)** — 14 payloads targeting higher-capability architectures (Tiers B–E).
+
+All payloads are in `attacks/payloads.json`.
 
 ## Project Structure
 
 ```
 ├── src/
-│   ├── react_agent.py      # ReAct baseline
-│   ├── pte_agent.py        # Plan-Then-Execute
-│   ├── dual_llm_agent.py   # Dual LLM
-│   ├── eval.py             # LLM judge (TCR/ASR)
-│   ├── tools.py            # Mock Stripe MCP tools
-│   ├── db.py               # SQLite results store
-│   ├── models.py           # Data models
-│   ├── config.py           # Config
-│   └── main.py             # CLI
+│   ├── react_agent.py           # ReAct baseline
+│   ├── pte_agent.py             # Plan-Then-Execute
+│   ├── dual_llm_agent.py        # Dual LLM
+│   ├── schema_dual_llm_agent.py # Schema Dual LLM
+│   ├── eval.py                  # LLM judge (TCR/ASR)
+│   ├── tools.py                 # Mock Stripe MCP tools
+│   ├── db.py                    # SQLite results store
+│   ├── models.py                # Data models
+│   ├── config.py                # Config
+│   └── main.py                  # CLI
 ├── attacks/
-│   └── payloads.json       # 56 injection payloads
+│   └── payloads.json            # 70 injection payloads (Tier A + extended)
 ├── data/
-│   └── evals.db            # Evaluation results
-├── logs/                   # Run logs
+│   └── evals.db                 # Evaluation results
+├── logs/                        # Run logs
 ├── tests/
-└── run_eval.sh             # Full benchmark runner
+├── run_eval.sh                  # Tier A benchmark runner
+└── run_v2.sh                    # v2 extended tiers runner
 ```
 
 ## Models Tested

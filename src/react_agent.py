@@ -44,6 +44,8 @@ class ReActAgent:
         self.messages: list[dict[str, Any]] = []
         self.tool_call_history: list[dict[str, Any]] = []
         self._custom_mock_tools = mock_tools is not None
+        self._input_tokens: int = 0
+        self._output_tokens: int = 0
 
         # Initialize the appropriate client
         if self.provider == "anthropic":
@@ -65,7 +67,8 @@ class ReActAgent:
     def reset(self):
         self.messages = []
         self.tool_call_history = []
-        # Don't reset mock tools if custom ones were provided (for injection testing)
+        self._input_tokens = 0
+        self._output_tokens = 0
         if not self._custom_mock_tools:
             reset_mock_tools()
 
@@ -149,6 +152,9 @@ class ReActAgent:
                     error=error_msg,
                 )
 
+            self._input_tokens += response.usage.input_tokens
+            self._output_tokens += response.usage.output_tokens
+
             if response.stop_reason == "end_turn":
                 final_text = ""
                 for block in response.content:
@@ -163,6 +169,8 @@ class ReActAgent:
                     tool_calls=self.tool_call_history,
                     latency_ms=elapsed,
                     latency_breakdown={"total_ms": elapsed},
+                    input_tokens=self._input_tokens,
+                    output_tokens=self._output_tokens,
                 )
 
             elif response.stop_reason == "tool_use":
@@ -185,7 +193,7 @@ class ReActAgent:
                         tool_results.append({
                             "type": "tool_result",
                             "tool_use_id": block.id,
-                            "content": json.dumps(result),
+                            "content": f"<external_content>\n{json.dumps(result)}\n</external_content>",
                         })
 
                 self.messages.append({"role": "assistant", "content": assistant_content})
@@ -239,6 +247,8 @@ class ReActAgent:
                     latency_breakdown={"total_ms": elapsed},
                 )
             message = response.choices[0].message
+            self._input_tokens += response.usage.prompt_tokens
+            self._output_tokens += response.usage.completion_tokens
 
             # Check if done (no tool calls)
             if not message.tool_calls:
@@ -252,6 +262,8 @@ class ReActAgent:
                     tool_calls=self.tool_call_history,
                     latency_ms=elapsed,
                     latency_breakdown={"total_ms": elapsed},
+                    input_tokens=self._input_tokens,
+                    output_tokens=self._output_tokens,
                 )
 
             # Process tool calls
@@ -286,7 +298,7 @@ class ReActAgent:
                 self.messages.append({
                     "role": "tool",
                     "tool_call_id": tool_call.id,
-                    "content": json.dumps(result),
+                    "content": f"<external_content>\n{json.dumps(result)}\n</external_content>",
                 })
 
         elapsed = (time.time() - t_start) * 1000
@@ -335,12 +347,16 @@ def run_with_injection(
 
     if injection_target == "all_payments":
         data_store.inject_into_all_payments(injection_payload)
+    elif injection_target == "all_payments_fields":
+        data_store.inject_fields_into_all_payments(injection_payload)
     elif injection_target.startswith("payment:"):
         payment_id = injection_target.split(":")[1]
         data_store.inject_into_payment(payment_id, injection_payload)
     elif injection_target == "all_customers":
         for c in data_store.customers:
             data_store.inject_into_customer(c["id"], injection_payload)
+    elif injection_target == "all_customers_fields":
+        data_store.inject_fields_into_all_customers(injection_payload)
     elif injection_target.startswith("customer:"):
         customer_id = injection_target.split(":")[1]
         data_store.inject_into_customer(customer_id, injection_payload)
@@ -349,6 +365,8 @@ def run_with_injection(
         data_store.inject_into_subscription(sub_id, injection_payload)
     elif injection_target == "all_subscriptions":
         data_store.inject_into_all_subscriptions(injection_payload)
+    elif injection_target == "all_subscriptions_fields":
+        data_store.inject_fields_into_all_subscriptions(injection_payload)
 
     mock_tools = MockStripeTools(data_store)
 
