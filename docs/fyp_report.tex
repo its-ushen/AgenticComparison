@@ -623,6 +623,7 @@ attacker-writable string field reaches it.
 
 \subsection{Evaluation Pipeline}
 
+\begin{sloppypar}
 Figure~\ref{fig:eval-pipeline} illustrates the evaluation pipeline for a single test case.
 To take a concrete example: the \texttt{subscription\_param\_price\_modification} payload
 contains a user request (\textit{``Check the status of Alice's subscription''}), an
@@ -635,6 +636,7 @@ response are collected and submitted alongside the original payload and expected
 behaviour to the judge as ground truth. The judge produces TCR and ASR verdicts, persisted
 to SQLite. This pipeline runs identically for all 70 payloads across all twelve
 configurations.
+\end{sloppypar}
 
 \begin{figure*}[t]
 \centering
@@ -1267,7 +1269,7 @@ Tier~B & Exact Stripe MCP tool syntax with
 Tier~C Class~1 & Response manipulation via description
                  fields: queries with no typed-field answer & 5 \\
 \midrule
-Tier~C Class~2 & Tool call manipulation via
+Tier~C Class~2 & \raggedright Tool call manipulation via
                  \texttt{customer.name}: vague action requests
                  resolved from injected name content & 5 \\
 \midrule
@@ -1376,6 +1378,7 @@ Schema~Dual~LLM achieves 0\% ASR at Haiku~4.5 and Sonnet~4.5 across all three
 runs with zero variance. At Haiku~3, Schema~Dual~LLM and Dual~LLM are identical at 11.9\%
 ASR, confirming that below the capability floor the extraction advantage disappears.
 
+\begin{sloppypar}
 Dual~LLM at Haiku~4.5 produces 7.1\% ASR with zero variance across runs. Interestingly
 for Sonnet~4.5, Dual~LLM produces 16.7\% average ASR with run-to-run variance. The
 \texttt{ext\_c\_payment\_delivery\_note} payload illustrates this directly: in Run~1,
@@ -1385,6 +1388,7 @@ only the typed payment fields and omitted the description entirely, producing ID
 outcomes. The quarantine passed the same content in all three runs. The orchestrator's
 decision to surface or suppress the description varied at temperature zero. The
 contrasting responses are documented in Appendix~\ref{appendix:variance}.
+\end{sloppypar}
 
 \subsection{Combined Results}
 
@@ -1560,6 +1564,7 @@ regardless of model capability. This class tests a different boundary than
 Tier~A: it does not require the agent to follow an instruction, only to include
 injected description data in its response.
 
+\begin{sloppypar}
 Tier~C Class~2 differentiates Dual~LLM from Schema~Dual~LLM. At Haiku~4.5,
 Dual~LLM produces 7.1\% ASR and Schema~Dual~LLM produces 0\%. At Sonnet~4.5,
 Dual~LLM produces 16.7\% ASR and Schema~Dual~LLM produces 0\%. The boundary is
@@ -1568,6 +1573,7 @@ names to the orchestrator as trusted data, where vague action requests cause
 the orchestrator to use injected name content as parameters.
 Schema~Dual~LLM's allowlist for \texttt{customers.read} is \texttt{[id,~email]};
 name is absent. The attack cannot reach the orchestrator.
+\end{sloppypar}
 
 \subsection{Does Deterministic Extraction Outperform Probabilistic Quarantine?}
 
