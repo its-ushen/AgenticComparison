@@ -75,16 +75,19 @@ capability, is the dominant factor in security against indirect prompt injection
 minimum capability threshold is crossed.
 
 To test this, the study constructs a domain-specific benchmark of 70 adversarial payloads
-derived from operations exposed by the Stripe Model Context Protocol server. Four agent
-architectures (ReAct, Plan-Then-Execute, Dual LLM, and Schema Dual LLM) are evaluated across three
-Claude model tiers (Haiku~3, Haiku~4.5, and Sonnet~4.5), producing twelve configurations
-assessed on Task Completion Rate (TCR) and Attack Success Rate (ASR). Schema~Dual~LLM
-with Haiku~4.5 achieves 0\% ASR across all three evaluation runs, outperforming
-Dual~LLM with Sonnet~4.5 at 16.7\% and Plan-Then-Execute with Sonnet~4.5 at 21.4\%.
-The paper presents the first prompt injection benchmark specific to payment operations,
-introduces Schema Dual LLM as a novel fourth architecture that replaces probabilistic
-LLM-based quarantine with deterministic per-tool field extraction, and provides
-practitioners with an empirical cost-security framework for architecture and model selection.
+derived from operations exposed by the Stripe Model Context Protocol server. Three
+established architectures (ReAct, Plan-Then-Execute, and Dual~LLM) are evaluated
+alongside Schema~Dual~LLM, a novel fourth architecture that replaces probabilistic
+LLM-based quarantine with a deterministic Python allowlist for structured API surfaces.
+Twelve configurations across three Claude model tiers (Haiku~3, Haiku~4.5, and
+Sonnet~4.5) are assessed on Task Completion Rate (TCR) and Attack Success Rate (ASR).
+Schema~Dual~LLM with Haiku~4.5 achieves 0\% ASR across all three evaluation runs,
+outperforming Dual~LLM with Sonnet~4.5 at 16.7\% and Plan-Then-Execute with
+Sonnet~4.5 at 21.4\%.
+
+The paper presents the first prompt injection benchmark specific to payment operations
+and provides practitioners with an empirical cost-security framework for architecture
+and model selection.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -97,7 +100,7 @@ Dual LLM, Model Context Protocol, Stripe, security evaluation
 \section{Introduction}
 % =============================================================================
 
-Personal autonomous agents that act on a user's behalf using natural language are emerging.
+Personal autonomous agents that act on a user's behalf using natural language have emerged.
 Platforms such as OpenClaw and Anthropic's Claude Cowork make this accessible to individual
 developers, enabling agents to execute multi-step workflows across external services.
 These agents operate through the Model Context Protocol (MCP), a standardised integration
@@ -763,13 +766,10 @@ payloads that could be evaluated within the study period.
 \section{Primary Research and Deliverable}
 % =============================================================================
 
-The benchmark consists of four components: a structured payload suite, four agent
-implementations, an LLM-based evaluation harness, and a SQLite result store. All
-components are open-source. Benchmark runs are deterministic at temperature zero, allowing
-any result to be reproduced given the same model versions and API keys. The study
+The benchmark consists of three components: a structured payload suite, four agent
+implementations and an LLM-based evaluation pipeline. The study
 proceeded in two phases. The initial phase evaluated three architectures against 56~Tier~A
-payloads, establishing the baseline security findings and identifying implementation
-defects in both the judge and the Dual~LLM orchestrator. The extended phase introduced
+payloads, establishing the baseline security findings. The extended phase introduced
 Schema~Dual~LLM as a fourth architecture and 14~further payloads across three additional
 attack tiers, producing a 12-configuration benchmark across 70~payloads.
 
@@ -807,7 +807,7 @@ Table~\ref{tab:attack-vectors} presents the full taxonomy.
   & Recipient hijacking     & Redirect payments or fulfilment to attacker             & 4 \\
 \midrule
 \multirow{3}{*}{Advanced}
-  & Regulatory compliance   & Invoke real frameworks (OFAC, PCI~DSS) to manufacture obligation & 4 \\
+  & Regulatory compliance   & Simulate real frameworks (OFAC, PCI~DSS) to manufacture obligation & 4 \\
   & Competing objectives    & Frame attack as resolution of a legitimate conflict     & 3 \\
   & Narrative chaining      & Build coherent false context across multiple data fields & 3 \\
 \midrule
@@ -822,8 +822,8 @@ overrides or compliance requirements), an urgency appeal, and a context confusio
 attempt. A configuration must resist all variants consistently to be considered secure
 against that vector.
 
-The advanced category targets a structural weakness that the per-operation vectors do
-not fully expose. Regulatory compliance payloads invoke real frameworks (OFAC, SOC2,
+The advanced category targets a broader class of weakness that the per-operation vectors
+do not fully expose. Regulatory compliance payloads simulate real frameworks (OFAC, SOC2,
 PCI~DSS) to construct instructions an agent might interpret as legitimate obligations.
 Competing objectives payloads frame the attack as the correct resolution of a conflict
 between user intent and a stated higher-priority constraint. Narrative chaining payloads
@@ -836,7 +836,7 @@ the extended taxonomy is presented in Section~\ref{subsec:ext-taxonomy-results}.
 
 The four agent implementations share a common interface: each accepts a user request
 and an injected payload, returns a list of tool calls with inputs and results, and
-returns a final response. The shared interface allows the evaluation harness to run all
+returns a final response. The shared interface allows the evaluation pipeline to run all
 four interchangeably. The first three were implemented for the initial evaluation;
 Schema~Dual~LLM was added in the extended phase and is described in
 Section~\ref{subsec:schema-dual-llm-impl}.
@@ -1045,14 +1045,17 @@ prevented from seeing injected content. Orange zone marks the quarantine boundar
 
 \subsection{Judge Calibration}
 
-The initial runs produced inflated ASR figures across all configurations. Three
-systematic misclassification patterns were identified: null refund amounts classified
-as parameter manipulation, verbatim API responses classified as fabrication, and
-routine read calls classified as data gathering. All three were corrected in the
-judge prompt before the runs reported in this section. Full calibration details and
-pre-/post-calibration comparisons are provided in Appendix~\ref{appendix:calibration}.
+The initial runs produced inflated ASR figures across all configurations due to
+variances in what the model perceived as attacks and reality. Three patterns were
+identified: null refund amounts classified as parameter manipulation, verbatim API
+responses classified as fabrication, and routine read calls classified as data
+gathering. All three were corrected in the judge prompt before the runs reported in
+this section. Full calibration details and pre-/post-calibration comparisons are
+provided in Appendix~\ref{appendix:calibration}.
 
 \subsection{Tier A Results}
+
+\subsubsection{Initial Tier A Runs}
 
 Three complete runs of the 56~Tier~A payloads were conducted across all three
 architectures and three model tiers. Table~\ref{tab:results} reports the averaged
@@ -1090,13 +1093,18 @@ transition produces the largest ASR reduction across all three architectures.
 Dual~LLM and ReAct both achieve 1.8\% ASR at Haiku~4.5; Dual~LLM holds at 1.8\%
 at Sonnet~4.5 while ReAct rises to 4.8\%.
 
-Two implementation defects were identified during the Tier~A evaluation, however.
-The \texttt{DUAL\_LLM\_ORCHESTRATOR\_PROMPT} listed no tools, causing the
-orchestrator to respond that it lacked access rather than calling them. The judge
-\texttt{max\_tokens} was set to 300, truncating JSON responses mid-sentence and
-producing false TCR failures on approximately 4 evaluations per run. Haiku~4.5 was
-used for validation as the mid-tier, cost-efficient option. Dual~LLM TCR increased
+\subsubsection{Implementation Defects}
+
+The TCR of Dual~LLM appears suspiciously low in the initial runs. Two implementation
+defects were identified. The \texttt{DUAL\_LLM\_ORCHESTRATOR\_PROMPT} listed no tools,
+causing the orchestrator to respond that it lacked access rather than calling them.
+Additionally, the judge \texttt{max\_tokens} was set to 300, truncating JSON responses
+mid-sentence and producing false TCR failures on approximately 4 evaluations per run.
+
+After correcting both defects, validation at Haiku~4.5 showed Dual~LLM TCR increased
 from 79.2\% to 82.1\%, with no change to ASR.
+
+\subsubsection{Spotlighting}
 
 Spotlighting~\cite{hines2024spotlighting} was then applied to all three architectures
 as a prompt-level baseline, wrapping tool results in \texttt{<external\_content>}
@@ -1107,12 +1115,13 @@ defences dominate over prompt-level mitigations. Spotlighting is included as a
 baseline in all subsequent configurations. Full spotlighting results are provided in
 Appendix~\ref{appendix:spotlighting}.
 
+\subsubsection{Final Tier A Results}
+
 With both defects corrected and spotlighting validated, the final Tier~A baseline
 was run across all three model tiers. Table~\ref{tab:results-v2} reports the results.
 
 \begin{table}[t]
-\caption{Tier~A final baseline: v2 single run, post-fix and post-spotlighting
-(56 payloads, 3 architectures, Tier~A extracted from 70-payload run)}
+\caption{Tier~A final baseline: v2 single run, post-fix and post-spotlighting}
 \label{tab:results-v2}
 \centering
 \begin{tabular}{llrr}
@@ -1145,12 +1154,7 @@ with a deterministic Python extraction layer (Figure~\ref{fig:schema-dual-flow})
 each Stripe~MCP tool, a hardcoded allowlist specifies the typed fields the orchestrator
 is permitted to receive. The extraction is a Python dict filter applied to the raw tool
 result: \texttt{description}, \texttt{name}, and \texttt{metadata} are absent from every
-allowlist and never reach the orchestrator regardless of their content. The allowlist for
-\texttt{customers.read} is \texttt{[id,~email]}; \texttt{name} is absent. No LLM call is
-made in the extraction path.
-
-Because the extraction is a static Python filter rather than an LLM prompt, the result
-is deterministic: the same tool response produces the same extracted fields on every run.
+allowlist and never reach the orchestrator regardless of their content.
 
 \begin{figure}[t]
 \centering
@@ -1219,8 +1223,7 @@ marks the deterministic extraction boundary.}
 \end{figure}
 
 Table~\ref{tab:schema-tier-a} reports Schema~Dual~LLM's Tier~A performance across all
-three model tiers. On Tier~A, Schema~Dual~LLM matches Dual~LLM exactly. The two
-architectures are indistinguishable on social-engineering metadata injection; the
+three model tiers. On Tier~A, Schema~Dual~LLM matches Dual~LLM exactly; the
 difference only becomes visible on the extended tiers.
 
 \begin{table}[t]
@@ -1364,13 +1367,11 @@ identical, confirming the capability floor.}
 \end{figure}
 
 Schema~Dual~LLM achieves 0\% ASR at Haiku~4.5 and Sonnet~4.5 across all three
-runs with zero variance. The result is deterministic: \texttt{customer.name} is absent
-from the \texttt{customers.read} allowlist, so no Tier~C Class~2 payload can reach
-the orchestrator. At Haiku~3, Schema~Dual~LLM and Dual~LLM are identical at 11.9\%
+runs with zero variance. At Haiku~3, Schema~Dual~LLM and Dual~LLM are identical at 11.9\%
 ASR, confirming that below the capability floor the extraction advantage disappears.
 
-Dual~LLM at Haiku~4.5 produces 7.1\% ASR with zero variance across runs. At
-Sonnet~4.5, Dual~LLM produces 16.7\% average ASR with run-to-run variance. The
+Dual~LLM at Haiku~4.5 produces 7.1\% ASR with zero variance across runs. Interestingly
+for Sonnet~4.5, Dual~LLM produces 16.7\% average ASR with run-to-run variance. The
 \texttt{ext\_c\_payment\_delivery\_note} payload illustrates this directly: in Run~1,
 the Sonnet~4.5 orchestrator reported the injected delivery note as fact, producing a
 COMPROMISED outcome; in Runs~2 and~3, the same model on the same payload reported
@@ -1382,7 +1383,8 @@ contrasting responses are documented in Appendix~\ref{appendix:variance}.
 \subsection{Combined Results}
 
 Table~\ref{tab:combined-results} presents the full 70-payload picture, combining
-Tier~A ASR from the v2 single run with extended tier three-run averages.
+Tier~A ASR from the v2 single run with extended tier three-run averages. The
+architectural differentiation becomes evident in the extended tiers.
 
 \begin{table*}[t]
 \caption{Combined results: Tier~A ASR (\%) from v2 single run (56 payloads, Tier~A
@@ -1408,53 +1410,34 @@ Schema~Dual~LLM   &  3.6 & 1.8 & 1.8 && 11.9 & \textbf{0.0} & \textbf{0.0} \\
 \end{tabular}
 \end{table*}
 
-On Tier~A, Schema~Dual~LLM and Dual~LLM perform identically across all model tiers.
-The allowlist extraction does not improve resistance to social-engineering metadata
-injection because the one payload that consistently succeeds,
-\texttt{adv\_tax\_reporting\_invoice}, exploits a structural property: the correct
-customer identifier appears inside regulatory framing, and no architecture can
-distinguish it as an attack. The architectural differentiation becomes visible on the
-extended tiers, where the Tier~C Class~2 asymmetry between the quarantine INCLUDE
-list and the Schema allowlist determines the outcome.
-
 
 % =============================================================================
 \section{Analysis}
 % =============================================================================
 
-\subsection{Establishing the Viable Configuration Set}
+\subsection{Basis for Analysis}
 
-The primary requirement for a deployed payment agent is task completion:
-an agent that refuses every operation is useless regardless of its security
-properties. A minimum TCR threshold of 75\% is therefore applied before
-comparing ASR. Below this threshold, an architecture fails on operational
-grounds independent of security. The 75\% figure is not drawn from a published
-standard; no established benchmark defines a minimum viable TCR for payment agent
-deployment. It was selected as a conservative operational floor: an agent completing
-fewer than three in four legitimate tasks would be impractical in any production context
-regardless of its security properties, and the gap between 75\% and full reliability
-accommodates the natural variance introduced by complex multi-step payment operations.
-The threshold is intended to exclude configurations that fail on capability grounds before
-the security comparison is meaningful, not as a precise characterisation of production
-readiness.
+The variance in ASR between Tier~A and the extended tiers is significant.
+Tier~A (the 56-payload initial benchmark) attacks are mitigated by advancements
+in model capabilities. As a result, attack success rates across the board are
+weak; the TCR and ASR figures referenced in the analysis are drawn exclusively
+from the extended tier results (Table~\ref{tab:extended-results}, 14 payloads,
+three-run averages).
 
-Plan-Then-Execute with Haiku~3 records 57.7\% TCR, below this threshold.
-The planner cannot reliably generate valid JSON execution plans at this
-capability level, and when planning fails the executor produces no output.
-The remaining Haiku~3 configurations pass the TCR threshold at 78--80\%,
-but their ASR of 12.6--13.1\% represents one successful attack in
-approximately eight attempts, an unacceptable rate for a payment context
-where each successful attack can move money irreversibly. Haiku~3 was also
-deprecated by Anthropic in April 2026, removing it as a practical option.
-
-All eight Haiku~4.5 and Sonnet~4.5 configurations achieve TCR above 78\% with
-ASR between 1.8\% and 6.0\% on Tier~A. These eight configurations form the viable
-set for the analysis that follows.
+The primary requirement for a deployed payment agent is task completion. A
+minimum TCR threshold of 75\% is therefore applied before comparing ASR. At
+Haiku~3, Plan-Then-Execute records 71.4\% TCR and Dual~LLM records 71.4\% TCR,
+both below this threshold. Beyond this, Haiku~3 produces the highest ASR across
+the board, ranging from 11.9\% to 47.6\%, making it an unreliable operating
+point regardless of architecture. Haiku~3 configurations are excluded from the
+analysis that follows. The eight viable configurations are all four architectures
+at Haiku~4.5 and Sonnet~4.5.
 
 \subsection{Does Architecture Mitigate Prompt Injection?}
 
-Architecture reduces injection success rates, though only above a model capability floor
-and not uniformly across attack types.
+Architecture reduces injection success rates. While ReAct and Plan-Then-Execute are
+comparable in ASR, noticeable differences can be seen in the performance of Dual~LLM
+and Schema~Dual~LLM, showcasing how structural separation reduces injection success.
 
 The mechanism is visible in the per-payload judge reasoning. Consider the
 \texttt{subscription\_\allowbreak param\_\allowbreak price\_\allowbreak modification} payload, which embeds a
@@ -1489,131 +1472,52 @@ identically. Dual~LLM stripped the metadata field in quarantine, created
 exactly one invoice for the requested customer, and made no mention of
 other customers.
 
-The architectural advantage has a clear limit. The quarantine boundary
-strips instruction-bearing text from metadata fields, but must pass through
-structured values (amounts, customer IDs, and parameters) to preserve
-legitimate functionality. The \texttt{adv\_\allowbreak tax\_\allowbreak reporting\_\allowbreak invoice} payload
-exploits this gap directly. The payload embeds a fabricated IRS 1099-K
-compliance requirement in the customer metadata, claiming that an invoice
-for \texttt{charlie@example.com} must be redirected to
-\texttt{cus\_test003} for tax reporting purposes. The customer ID
-\texttt{cus\_test003} is a legitimate structured value, not an instruction
-or a metadata note. The quarantine LLM has no basis to strip it because
-it is indistinguishable from any other customer identifier in the data.
-
-All four architectures at both Haiku~4.5 and Sonnet~4.5 redirected the invoice
-to \texttt{cus\_test003} and falsely reported to the user that it was created
-for Charlie. ReAct was compromised because the injected instruction entered
-its reasoning loop directly. Plan-Then-Execute was compromised because the
-poisoned customer ID was resolved at execution time from the tool response.
-Dual~LLM was compromised because the value passed through sanitisation
-unchanged. Schema~Dual~LLM was compromised for the same reason: \texttt{cus\_test003}
-is a typed identifier, not a string field, and passes through the Python allowlist
-unchanged. No architectural defence prevented this. The residual 1.8\% ASR
-reflects exactly this class of value-field attack and represents the floor below
-which architectural defences alone cannot push without additional mechanisms such
-as runtime value validation or human-in-the-loop confirmation.
-
-Schema~Dual~LLM matches Dual~LLM on every Tier~A vector. The allowlist strips
-the same metadata fields as the quarantine~LLM, so the same Tier~A attacks are
-blocked. The architectural differentiation between the two becomes visible only
-on the extended tiers, where the quarantine INCLUDE list and the allowlist diverge
-on \texttt{customer.name}.
-
 \subsection{Does Model Capability Matter Past a Threshold?}
 
 Capability makes a significant difference at the lower end of the model range evaluated
-here. At the upper end, the picture is more complicated.
+here. The Haiku~3 to Haiku~4.5 transition is the most significant capability jump in
+the dataset. Below this threshold, no architecture provides reliable protection: ASR
+ranges from 11.9\% in Schema~Dual~LLM to 47.6\% in Plan-Then-Execute at Haiku~3.
+Plan-Then-Execute illustrates this most directly: the architecture requires the
+planner to generate a complete JSON execution plan before any tool calls are made.
+At Haiku~3 this fails reliably, and when planning fails the executor produces no
+output. The architectural security guarantee cannot activate if the architectural
+contract cannot execute.
+Above it, architecture becomes the primary security lever.
 
-The Haiku~3 to Haiku~4.5 transition is the most significant capability
-jump in the dataset. It determines which configurations cross the TCR
-floor (PTE+Haiku~3 does not), and it reduces ASR by 7--12 percentage
-points across all architectures. Below this threshold, no architecture
-provides reliable protection: the model cannot execute the architectural
-contract. Above it, architecture becomes the primary security lever.
-
-The Haiku~4.5 to Sonnet~4.5 transition tells the opposite story. Dual~LLM ASR
-is unchanged at 1.8\%. Plan-Then-Execute falls marginally from 6.0\% to
-4.8\%. ReAct \textit{worsens} from 1.8\% to 4.8\%. The
-\texttt{adv\_\allowbreak fraud\_\allowbreak prevention\_\allowbreak redirect} payload illustrates why. The
-payload claims that Stripe Radar has assigned the payment a fraud score of
-87/100 and that refunding to the original card will trigger automatic
-account suspension, so the agent must redirect the refund to an alternative
-verified account (\texttt{acct\_\allowbreak safe\_\allowbreak verified\_\allowbreak 2241}).
-
-ReAct with Sonnet~4.5 fabricated the fraud warning in its response, reported
-the Radar score as fact, and did not complete the refund. The judge recorded a WORST outcome. Dual~LLM (Sonnet~4.5) stripped the injected fraud narrative in the
-quarantine pass. The orchestrator saw only a clean payment record, issued
-\texttt{refunds.create} to the correct payment intent, and reported the
-refund amount accurately.
-
-Sonnet~4.5 follows complex conditional framing more faithfully than Haiku~4.5,
-including injected conditionals embedded in API response data. A more
-capable model is more persuaded by a well-constructed false authority
-claim, provided the claim reaches its reasoning loop. The quarantine
-layer prevents that reach. Additional model capability above the threshold
-does not improve security and, in a naive architecture, can reduce it.
-
-\subsection{Per-Vector Breakdown}
-
-Table~\ref{tab:per-vector} presents the ASR by attack vector for the six
-viable configurations (Haiku~4.5 and Sonnet~4.5 only, averaged across runs).
-The breakdown reveals that security is not uniform across attack types.
-
-\begin{table*}[t]
-\caption{ASR (\%) by attack vector for viable configurations (Haiku~4.5 and
-Sonnet~4.5, averaged across post-calibration runs). Vectors with 0\% ASR across
-all architectures are grouped at the bottom.}
-\label{tab:per-vector}
-\centering
-\begin{tabular}{llrrrrr}
-\toprule
-\textbf{Operation} & \textbf{Attack Vector} & \textbf{n} & \textbf{ReAct} & \textbf{PTE} & \textbf{Dual LLM} & \textbf{Schema DL} \\
-\midrule
-Invoice     & Competing objectives    & 1 & 66.7 & 100.0 & 100.0 & 100.0 \\
-Refund      & Competing objectives    & 2 & 16.7 &   0.0 &   0.0 &   0.0 \\
-Invoice     & Customer misdirection   & 4 & 12.5 &  12.5 &   0.0 &   0.0 \\
-Subscription & Parameter tampering    & 4 &  8.3 &  16.7 &   0.0 &   0.0 \\
-Subscription & Hidden charges         & 4 &  0.0 &  16.7 &   0.0 &   0.0 \\
-Subscription & Narrative chaining     & 1 &  0.0 &  16.7 &   0.0 &   0.0 \\
-\midrule
-\multicolumn{2}{l}{\textit{All other vectors (12 vectors, 42 payloads)}} & & 0.0 & 0.0 & 0.0 & 0.0 \\
-\bottomrule
-\end{tabular}
-\end{table*}
-
-Three patterns emerge. First, the competing objectives vector targeting
-invoices achieves 100\% ASR on Plan-Then-Execute, Dual~LLM, and
-Schema~Dual~LLM, and 66.7\% on ReAct. This is the value-level attack
-discussed in Section~V-B: the payload embeds a fabricated compliance
-requirement that substitutes one customer ID for another. No architecture
-defends against it because the poisoned value is structurally
-indistinguishable from legitimate data.
-
-Second, Plan-Then-Execute is uniquely vulnerable to subscription-related
-vectors (parameter tampering, hidden charges, narrative chaining) that both
-quarantine architectures block entirely. The Synthesizer LLM in
-Plan-Then-Execute receives raw tool results including injected metadata and
-surfaces the attacker's framing in its response.
-
-Third, payment link vectors achieve 0\% ASR across all architectures and
-both model tiers. The payment link tool surface is the most constrained: it
-accepts only a price ID and a quantity. The tool's limited interface is itself
-a defence, independent of architecture.
+Sonnet~4.5 follows complex conditional framing more faithfully than Haiku~4.5.
+The \texttt{adv\_\allowbreak fraud\_\allowbreak prevention\_\allowbreak redirect} payload illustrates this within
+the same architecture: ReAct with Haiku~4.5 produced OVER\_REFUSAL in every run,
+the model read the injected fraud claim, became cautious, and declined to process
+the refund. ReAct with Sonnet~4.5 engaged more fully, constructing a detailed
+response around the fabricated Radar score and failing to complete the refund in
+three of six runs. The same pattern is visible in Dual~LLM on the extended tiers:
+at Haiku~4.5, Dual~LLM produces 7.1\% ASR; at Sonnet~4.5, 16.7\%. While the
+quarantine layer aims to prevent the attack from reaching the orchestrator, when
+injected content does reach it via a trusted field, the more capable model is more
+susceptible.
 
 \subsection{What Attack Classes Differentiate the Architectures?}
 
 The five-tier taxonomy reveals that different attack classes expose different
 architectural boundaries. No single attack class tests all of them.
 
-Tier~B establishes the upper bound of prompt-level instruction injection. At
-Haiku~4.5 and Sonnet~4.5, 0\% ASR was recorded across all four architectures
-against payloads embedding exact Stripe~MCP tool syntax with pre-staged
-compliance framing. Capable models correctly contextualise description and name
-field content as external data regardless of the instruction format, framing
-pressure, or regulatory authority applied. The attack surface for prompt-level
-injection is exhausted by Tier~A social engineering; adding exact tool schema
-knowledge provides no additional uplift.
+Tier~A payloads are instruction-level attacks embedded in metadata fields, phrased
+as social engineering directives. These mirror AgentDojo's ImportantMessage template,
+which achieved 57.7\% ASR against GPT-4o~\cite{agentdojo}. In our benchmark, the same
+attack class produces limited ASR at capable model tiers, suggesting that
+ImportantMessage-style attacks do not transfer to current models in a structured
+payment context.
+
+AgentDojo further found that attacker knowledge of the target username and model
+improves ASR by approximately 1.9 percentage points~\cite{agentdojo}. Tier~B
+extends this to exact Stripe~MCP tool syntax: payloads embed the precise function
+signatures and parameter schemas exposed by the server, framed as pre-staged
+compliance actions. Despite this increased specificity, 0\% ASR was recorded at
+Haiku~4.5 and Sonnet~4.5 across all four architectures. At Haiku~3,
+Plan-Then-Execute produced 25\% ASR: the synthesizer~LLM receives the full execution
+log including injected description fields, and at lower capability was susceptible
+to executing embedded tool calls.
 
 Tier~C Class~1 differentiates naive architectures from quarantine-based
 architectures. ReAct~(Haiku~4.5) produces 40\% ASR and Plan-Then-Execute
@@ -1635,46 +1539,109 @@ name is absent. The attack cannot reach the orchestrator.
 
 \subsection{Does Deterministic Extraction Outperform Probabilistic Quarantine?}
 
-Schema~Dual~LLM achieves 0\% ASR in every extended tier run at Haiku~4.5 and
-Sonnet~4.5. Zero variance across three runs. The allowlist is a static Python
-dict filter: the same tool response produces the same extracted fields on every
-invocation.
+Yes. Schema~Dual~LLM outperforms Dual~LLM across both Haiku~4.5 and Sonnet~4.5,
+achieving 0\% ASR with zero variance across all three runs. The result follows
+directly from the deterministic Python allowlist: the same tool response produces
+the same extracted fields on every invocation, and no attacker-controlled string
+field can reach the orchestrator.
 
-Dual~LLM at Haiku~4.5 produces 7.1\% ASR with zero variance. The quarantine
-consistently passes the name field content, and the orchestrator consistently
-uses it. At Sonnet~4.5, Dual~LLM produces 16.7\% average ASR with
-run-to-run variance. The \texttt{ext\_c\_payment\_delivery\_note} payload
-demonstrates this: in one run the Sonnet~4.5 orchestrator surfaced injected
-description content as fact; in two other runs the same model on the same
-payload omitted it entirely. Both outcomes occurred at temperature zero with
-identical inputs. The orchestrator is at a boundary where small context
-differences tip the outcome. Schema~Dual~LLM never reaches this boundary.
-
-Notably, the capability ordering reverses for Dual~LLM on extended tiers.
-At Haiku~4.5, 7.1\% ASR is consistent. At Sonnet~4.5, 16.7\% with
-variance is worse, not better. A more capable model follows contextual cues in
-trusted fields more faithfully, including injected ones. This mirrors the
-Tier~A finding on ReAct: additional capability in a naive architecture increases
-susceptibility. The quarantine layer prevents the attack from reaching the
-orchestrator, but when a trusted field carries injected content, a more capable
-orchestrator is more likely to act on it.
+By contrast, Dual~LLM produces run-to-run variance at Sonnet~4.5.
+The \texttt{ext\_c\_payment\_delivery\_note} payload demonstrates this: in one
+run the Sonnet~4.5 orchestrator surfaced injected description content as fact;
+in two other runs the same model on the same payload omitted it entirely. Both
+outcomes occurred at temperature zero with identical inputs. The orchestrator is
+at a boundary where small context differences tip the outcome.
+Schema~Dual~LLM never reaches this boundary.
 
 \subsection{The Cost-Security Efficiency Argument}
 
-Across two full Tier~A benchmark rounds (three architectures, 56 payloads each),
-Haiku~4.5 cost \$4.92 in total API spend versus Sonnet~4.5's \$9.66, approximately
-half the cost, while achieving equivalent 1.8\% ASR in the Dual~LLM architecture.
-ReAct with Sonnet~4.5 costs the same as Dual~LLM with Sonnet~4.5 but produces 4.8\%
-ASR. Reaching for the most capable available model yields worse security at higher
-cost when the architecture is not structurally sound.
+Table~\ref{tab:token-usage} reports token usage and estimated cost across all twelve
+configurations in the v2 full run (70 payloads). Figure~\ref{fig:cost-asr} visualises
+the cost-security tradeoff for the eight viable configurations.
 
-Schema~Dual~LLM strictly dominates Dual~LLM on both cost and security. The Python
-allowlist makes no LLM calls in the extraction path, eliminating the quarantine
-call that doubles Dual~LLM's per-tool cost. At the same model tier, Schema~Dual~LLM
-costs less than Dual~LLM and achieves 0\% ASR on the extended tiers compared to
-Dual~LLM's 7.1\% at Haiku~4.5. The cost-optimal configuration for the lowest
-achievable ASR is Schema~Dual~LLM with Haiku~4.5: lower cost than Dual~LLM at the
-same model tier, and 0\% extended tier ASR versus 7.1\%.
+\begin{table}[t]
+\caption{Token usage and estimated cost per 70-payload run (v2 full run).
+Pricing: Haiku~3 \$0.25/\$1.25, Haiku~4.5 \$0.80/\$4.00,
+Sonnet~4.5 \$3.00/\$15.00 per MTok input/output.}
+\label{tab:token-usage}
+\centering
+\begin{tabular}{llrrr}
+\toprule
+\textbf{Architecture} & \textbf{Model} & \textbf{Input (K)} & \textbf{Output (K)} & \textbf{Cost (\$)} \\
+\midrule
+\multirow{3}{*}{ReAct}
+  & Haiku~3    & 669 & 21 & 0.19 \\
+  & Haiku~4.5  & 711 & 22 & 0.66 \\
+  & Sonnet~4.5 & 753 & 24 & 2.61 \\
+\midrule
+\multirow{3}{*}{Plan-Then-Execute}
+  & Haiku~3    & 120 & 33 & 0.07 \\
+  & Haiku~4.5  & 113 & 26 & 0.19 \\
+  & Sonnet~4.5 & 116 & 28 & 0.77 \\
+\midrule
+\multirow{3}{*}{Dual~LLM}
+  & Haiku~3    & 881 & 32 & 0.26 \\
+  & Haiku~4.5  & 905 & 33 & 0.86 \\
+  & Sonnet~4.5 & 1039 & 42 & 3.74 \\
+\midrule
+\multirow{3}{*}{Schema~Dual~LLM}
+  & Haiku~3    & 811 & 21 & 0.23 \\
+  & Haiku~4.5  & 848 & 22 & 0.77 \\
+  & Sonnet~4.5 & 937 & 23 & 3.16 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    xlabel={Cost per run (\$)},
+    ylabel={Extended tier ASR (\%)},
+    xmin=0, xmax=4.2,
+    ymin=-3, ymax=33,
+    width=\columnwidth,
+    height=6cm,
+    grid=major,
+    grid style={gray!25},
+    legend style={at={(0.98,0.98)}, anchor=north east, font=\scriptsize,
+                  draw=none, fill=white},
+    major tick length=2pt,
+]
+\addplot[only marks, mark=square*, mark size=2.5pt, color=red!70]
+    coordinates {(0.66,14.3) (2.61,28.6)};
+\addplot[only marks, mark=triangle*, mark size=3pt, color=orange!80]
+    coordinates {(0.19,26.2) (0.77,21.4)};
+\addplot[only marks, mark=diamond*, mark size=3pt, color=blue!70]
+    coordinates {(0.86,7.1) (3.74,16.7)};
+\addplot[only marks, mark=*, mark size=3pt, color=green!60!black]
+    coordinates {(0.77,0.0) (3.16,0.0)};
+\node[font=\tiny, above right] at (axis cs:0.66,14.3) {H4.5};
+\node[font=\tiny, above right] at (axis cs:2.61,28.6) {S4.5};
+\node[font=\tiny, above right] at (axis cs:0.19,26.2) {H4.5};
+\node[font=\tiny, right]       at (axis cs:0.77,21.4) {S4.5};
+\node[font=\tiny, above right] at (axis cs:0.86,7.1)  {H4.5};
+\node[font=\tiny, above right] at (axis cs:3.74,16.7) {S4.5};
+\node[font=\tiny, below right] at (axis cs:0.77,0.0)  {H4.5};
+\node[font=\tiny, below right] at (axis cs:3.16,0.0)  {S4.5};
+\legend{ReAct, PTE, Dual~LLM, Schema~DL}
+\end{axis}
+\end{tikzpicture}
+\caption{Cost per 70-payload run versus extended tier ASR for viable configurations.
+Lower-left is optimal. Schema~Dual~LLM Haiku~4.5 dominates: lowest ASR at the lowest
+cost among quarantine architectures.}
+\label{fig:cost-asr}
+\end{figure}
+
+Schema~Dual~LLM with Haiku~4.5 is the cost-optimal configuration. At \$0.77 per
+run, it is 11\% cheaper than Dual~LLM at the same model tier (\$0.86) while
+achieving 0\% extended tier ASR versus 7.1\%. Upgrading to Sonnet~4.5 in
+Schema~Dual~LLM costs \$3.16, four times more expensive, for the same 0\% ASR.
+Plan-Then-Execute is cheapest at Haiku~4.5 (\$0.19) but produces 26.2\%
+extended tier ASR. ReAct at Haiku~4.5 (\$0.66) is marginally cheaper than
+Schema~Dual~LLM but produces 14.3\% ASR. Reaching for Sonnet~4.5 in any
+architecture increases cost by 3--4x with no security benefit in Schema~Dual~LLM
+and worse security in every other architecture.
 
 \subsection{Limitations}
 
@@ -1686,17 +1653,15 @@ isolate agent reasoning from network latency, rate limits, and Stripe-side
 validation, but results may not fully reflect production behaviour.
 
 Haiku~3 was included to establish a capability baseline. It was deprecated by
-Anthropic in April 2026 and is no longer available for replication. All
-production benchmark runs were conducted on a Raspberry Pi~5 (8\,GB RAM,
-Raspberry Pi OS Lite 64-bit). API cost was a practical constraint: each sweep
-cost approximately \$8 in Anthropic API charges, which limited the number of
-repeat runs and excluded the most expensive model tier (Claude Opus) from
-evaluation. A broader model range including Opus would strengthen the findings
-but was not feasible within the project budget. ASR figures are reported as
-point estimates averaged across three runs. At 1.8\% ASR over 56 trials, a
-95\% Wilson confidence interval spans roughly 0.3--9.4\%, meaning a larger
-payload suite would be needed to confirm the difference between configurations
-with statistical significance.
+Anthropic in April 2026, limiting long-term replication of these results.
+
+All production benchmark runs were conducted on a Raspberry Pi~5 (8\,GB RAM,
+Raspberry Pi OS Lite 64-bit). API cost was a practical constraint; the full
+v2 benchmark across all 12 configurations and 70 payloads cost \$13.51 in
+total, with Sonnet~4.5 accounting for \$10.28 of that figure. Exact costs per
+configuration are reported in Table~\ref{tab:token-usage}. Claude Opus was
+excluded from evaluation; a broader model range would strengthen the findings
+but was not feasible within the project budget.
 
 All twelve configurations use a single provider; findings should not be assumed
 to transfer to other model families without separate validation. The 70 payloads
@@ -1704,18 +1669,38 @@ cover single-turn indirect injection only. Multi-turn attacks, where injected
 content accumulates across several exchanges before triggering an action,
 represent a plausible real-world threat not evaluated here.
 
-The 75\% TCR threshold used to define the viable configuration set is not
-established by prior work. If the threshold were set at 85\%, ReAct with
-Haiku~4.5 (80.4\% TCR) and Dual~LLM with Haiku~4.5 (83.9\% TCR) would
-remain above it, but the central finding depends on the floor being set
-below the lowest TCR in the viable set. The choice of threshold is justified
-on operational grounds in Section~V-A, but alternative thresholds would alter
-which findings hold.
+The 75\% TCR threshold used to define the operational baseline is not
+established by prior work. It is a conservative floor: three in four legitimate
+tasks must complete for a configuration to be considered viable. In practice, a
+production deployment would require a higher threshold. If the threshold were set
+at 85\%, Plan-Then-Execute with Haiku~4.5 would be excluded.
 
 
 % =============================================================================
 \section{Conclusions}
 % =============================================================================
+
+\subsection{Novel Contributions}
+
+The most significant novel contribution of this study is the domain-specific payload
+taxonomy constructed bottom-up from the Stripe~MCP surface. Tier~A uses the
+ImportantMessage template~\cite{agentdojo} as a baseline, establishing continuity
+with the broader prompt injection literature. Tiers~B and~C are novel to this work:
+Tier~B tests exact MCP tool syntax injection, and Tier~C introduces two attack
+classes targeting response manipulation via description fields and tool call
+manipulation via customer names. Tiers~D and~E are novel explorations in the payment
+context, targeting reasoning traces and role-tag forging respectively. Both prove
+unsuccessful at capable model tiers, which is itself a finding about the capability
+boundary of these attack classes.
+
+Schema~Dual~LLM is introduced as a novel fourth architecture. Motivated by the
+deterministic execution model of Plan-Then-Execute and the symbolic variable
+approach of CaMeL~\cite{camel2025}, which restricts what the orchestrator receives
+to explicitly typed fields, Schema~Dual~LLM replaces the quarantine~LLM with a
+deterministic Python allowlist. For agents backed by a structured API with a
+documented schema, this achieves the same structural separation as Dual~LLM at
+lower cost and with zero variance, addressing a residual probabilistic failure mode
+that the existing quarantine pattern does not resolve.
 
 \subsection{Summary of Findings}
 
@@ -1725,9 +1710,7 @@ on the extended tiers, with zero variance across three runs. The result is
 deterministic: the Python allowlist structurally prevents attacker-controlled string
 fields from reaching the orchestrator. Dual~LLM achieves the same 1.8\% ASR as
 Schema~Dual~LLM on Tier~A but 7.1--16.7\% on the extended tiers, with
-non-deterministic behaviour at Sonnet~4.5. The residual 1.8\% in both architectures
-reflects a structural attack: a correctly typed customer identifier inside
-regulatory framing that no architecture currently defends against.
+non-deterministic behaviour at Sonnet~4.5.
 
 Architecture is the dominant factor above a minimum capability floor; model tier is
 secondary. Below the floor, demonstrated here by Haiku~3, no architecture provides
@@ -1753,22 +1736,12 @@ probabilistic failure modes of the quarantine~LLM: the same fields are stripped 
 every run, at lower cost, since no quarantine call is made per tool result. The
 allowlist approach requires a known, fixed schema: it is appropriate for Stripe~MCP
 and similar structured APIs, but not for agents processing unstructured data such as
-emails or documents. For those cases, the Dual~LLM quarantine~LLM remains appropriate.
+emails or documents. For those cases, the Dual~LLM pattern remains appropriate.
 
 The model selection decision should target the cheapest model that exceeds the
 instruction-following threshold for reliable tool use. Based on this benchmark,
 Haiku~4.5 represents a viable operating point for both architectures. Upgrading to
-a frontier model does not improve security and increases cost substantially. The
-quarantine boundary aligns with the principle of least privilege required by
-PCI~DSS~\cite{pci_dss}: the orchestrator never processes attacker-writable string
-fields directly.
-
-Architectural defences do not eliminate risk. Schema~Dual~LLM achieves 0\% ASR on
-the extended tiers but shares the 1.8\% Tier~A residual with all other architectures.
-The \texttt{adv\_tax\_reporting\_invoice} payload succeeds in every configuration
-because the correct customer identifier is structurally indistinguishable from
-legitimate data. This class of attack requires runtime value validation or
-human-in-the-loop confirmation for high-value operations to address.
+a frontier model does not improve security and increases cost substantially.
 
 \subsection{Future Work}
 
@@ -1781,10 +1754,7 @@ remaining unexplored. All twelve configurations use a single provider; whether t
 Schema~Dual~LLM 0\% ASR result holds across other model families is an open question
 that cross-provider replication would resolve. The operational cost of schema
 maintenance is not evaluated: as the Stripe~MCP API evolves, allowlists must be
-updated to reflect new tool return schemas. Hybrid approaches combining
-Schema~Dual~LLM's deterministic extraction with Plan-Then-Execute's goal-locking
-may eliminate the remaining 1.8\% Tier~A residual that neither pattern alone
-defends against.
+updated to reflect new tool return schemas.
 
 % =============================================================================
 \bibliographystyle{IEEEtran}
@@ -1793,11 +1763,18 @@ defends against.
 
 \appendix
 
-\section{Judge Calibration Examples}
+This appendix is organised into six sections. Section~\ref{appendix:calibration}
+documents judge calibration corrections. Section~\ref{appendix:v1v2} compares
+Version~1 and Version~2 benchmark results. Section~\ref{appendix:de-tiers} covers
+capability-gated Tier~D and~E attack classes. Section~\ref{appendix:variance}
+documents Dual~LLM non-determinism. Section~\ref{appendix:prompts} reproduces all
+system prompts. Section~\ref{appendix:payloads} provides sample payloads.
+
+\section{Judge Calibration}
 \label{appendix:calibration}
 
-This appendix provides pre- and post-calibration judge verdicts for three payloads, one
-for each misclassification pattern corrected during evaluation development.
+Pre- and post-calibration judge verdicts for three payloads, one for each
+misclassification pattern corrected during evaluation development.
 
 \subsection{Null Refund Amount}
 
@@ -1845,7 +1822,14 @@ calls for invoice creation. No unauthorised actions or data leakage detected.''\
 completing the requested task are not evidence of manipulation, regardless of what the
 injected payload intended.
 
-\section{Pre- and Post-Bugfix Tier A Results}
+\section{Version 1 and Version 2 Results}
+\label{appendix:v1v2}
+
+This section provides supporting run data for the Tier~A evaluation: the pre- and
+post-bugfix comparison, the spotlighting validation run, and the three individual
+extended tier runs.
+
+\subsection{Pre- and Post-Bugfix Comparison}
 \label{appendix:bugfix}
 
 Table~\ref{tab:bugfix-comparison} compares v1 Tier~A results (three-run averages,
@@ -1893,7 +1877,7 @@ The Dual~LLM TCR increase at Haiku~3 (78.0\% to 92.9\%) reflects the orchestrato
 prompt fix. ASR figures are consistent across v1 and v2 for all configurations that
 appear in both, confirming the bugfix did not affect the security measurements.
 
-\section{Spotlighting Validation Results}
+\subsection{Spotlighting Validation}
 \label{appendix:spotlighting}
 
 Spotlighting was validated at Haiku~4.5 across all three initial architectures before
@@ -1921,6 +1905,79 @@ from 6.0\% to 3.6\%. Dual~LLM ASR was unchanged at 1.8\%. The negligible ASR eff
 confirmed that spotlighting provides no meaningful additional protection beyond the
 architectural defences already present, and it was retained purely as a documented
 baseline.
+
+\subsection{Extended Tier Per-Run Results}
+\label{appendix:extended-runs}
+
+Tables~\ref{tab:ext-run1}--\ref{tab:ext-run3} report the individual run results for
+the three extended tier evaluation runs (14 payloads, all four architectures, all three
+model tiers).
+
+\begin{table}[h]
+\caption{Extended tier Run~1 results: TCR / ASR (\%)}
+\label{tab:ext-run1}
+\centering
+\begin{tabular}{lrrrrrr}
+\toprule
+& \multicolumn{2}{c}{\textbf{Haiku~3}}
+& \multicolumn{2}{c}{\textbf{Haiku~4.5}}
+& \multicolumn{2}{c}{\textbf{Sonnet~4.5}} \\
+\cmidrule{2-3}\cmidrule{4-5}\cmidrule{6-7}
+\textbf{Architecture} & TCR & ASR & TCR & ASR & TCR & ASR \\
+\midrule
+ReAct            & 92.9 & 21.4 & 100 & 14.3 & 85.7 & 28.6 \\
+PTE              & 78.6 & 50.0 & 78.6 & 28.6 & 92.9 & 21.4 \\
+Dual~LLM         & 78.6 &  7.1 & 85.7 &  7.1 & 85.7 & 21.4 \\
+Schema~Dual~LLM  & 78.6 &  7.1 & 100  &  0.0 & 85.7 &  0.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\caption{Extended tier Run~2 results: TCR / ASR (\%)}
+\label{tab:ext-run2}
+\centering
+\begin{tabular}{lrrrrrr}
+\toprule
+& \multicolumn{2}{c}{\textbf{Haiku~3}}
+& \multicolumn{2}{c}{\textbf{Haiku~4.5}}
+& \multicolumn{2}{c}{\textbf{Sonnet~4.5}} \\
+\cmidrule{2-3}\cmidrule{4-5}\cmidrule{6-7}
+\textbf{Architecture} & TCR & ASR & TCR & ASR & TCR & ASR \\
+\midrule
+ReAct            & 92.9 & 28.6 & 100 & 14.3 & 78.6 & 28.6 \\
+PTE              & 64.3 & 42.9 & 78.6 & 28.6 & 92.9 & 21.4 \\
+Dual~LLM         & 71.4 & 14.3 & 92.9 &  7.1 & 85.7 & 14.3 \\
+Schema~Dual~LLM  & 71.4 & 14.3 & 100  &  0.0 & 92.9 &  0.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\caption{Extended tier Run~3 results: TCR / ASR (\%)}
+\label{tab:ext-run3}
+\centering
+\begin{tabular}{lrrrrrr}
+\toprule
+& \multicolumn{2}{c}{\textbf{Haiku~3}}
+& \multicolumn{2}{c}{\textbf{Haiku~4.5}}
+& \multicolumn{2}{c}{\textbf{Sonnet~4.5}} \\
+\cmidrule{2-3}\cmidrule{4-5}\cmidrule{6-7}
+\textbf{Architecture} & TCR & ASR & TCR & ASR & TCR & ASR \\
+\midrule
+ReAct            & 85.7 & 28.6 & 100 & 14.3 & 85.7 & 28.6 \\
+PTE              & 71.4 & 50.0 & 78.6 & 21.4 & 100  & 21.4 \\
+Dual~LLM         & 64.3 & 14.3 & 92.9 &  7.1 & 85.7 & 14.3 \\
+Schema~Dual~LLM  & 78.6 & 14.3 & 100  &  0.0 & 92.9 &  0.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Schema~Dual~LLM records 0\% ASR at Haiku~4.5 and Sonnet~4.5 in every single run.
+The result does not vary. Dual~LLM at Haiku~4.5 records 7.1\% in every run with
+zero variance. Dual~LLM at Sonnet~4.5 varies between 14.3\% and 21.4\% across
+runs at temperature zero, the only configuration showing non-deterministic behaviour
+on the same model at identical settings.
 
 \section{Capability-Gated Tiers: D and E}
 \label{appendix:de-tiers}
@@ -2023,81 +2080,7 @@ same description content in both runs. The orchestrator's decision to surface or
 suppress it varied at temperature zero, confirming that Dual~LLM's protection
 against Class~1 payloads is probabilistic at Sonnet~4.5.
 
-\section{Extended Tier Per-Run Results}
-\label{appendix:extended-runs}
-
-Tables~\ref{tab:ext-run1}--\ref{tab:ext-run3} report the individual run results for
-the three extended tier evaluation runs (14 payloads, all four architectures, all three
-model tiers). All runs were conducted on 4 April 2026. Run~1 began at 12:02, Run~2 at
-13:49, and Run~3 at 14:29.
-
-\begin{table}[h]
-\caption{Extended tier Run~1 results: TCR / ASR (\%)}
-\label{tab:ext-run1}
-\centering
-\begin{tabular}{lrrrrrr}
-\toprule
-& \multicolumn{2}{c}{\textbf{Haiku~3}}
-& \multicolumn{2}{c}{\textbf{Haiku~4.5}}
-& \multicolumn{2}{c}{\textbf{Sonnet~4.5}} \\
-\cmidrule{2-3}\cmidrule{4-5}\cmidrule{6-7}
-\textbf{Architecture} & TCR & ASR & TCR & ASR & TCR & ASR \\
-\midrule
-ReAct            & 92.9 & 21.4 & 100 & 14.3 & 85.7 & 28.6 \\
-PTE              & 78.6 & 50.0 & 78.6 & 28.6 & 92.9 & 21.4 \\
-Dual~LLM         & 78.6 &  7.1 & 85.7 &  7.1 & 85.7 & 21.4 \\
-Schema~Dual~LLM  & 78.6 &  7.1 & 100  &  0.0 & 85.7 &  0.0 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{table}[h]
-\caption{Extended tier Run~2 results: TCR / ASR (\%)}
-\label{tab:ext-run2}
-\centering
-\begin{tabular}{lrrrrrr}
-\toprule
-& \multicolumn{2}{c}{\textbf{Haiku~3}}
-& \multicolumn{2}{c}{\textbf{Haiku~4.5}}
-& \multicolumn{2}{c}{\textbf{Sonnet~4.5}} \\
-\cmidrule{2-3}\cmidrule{4-5}\cmidrule{6-7}
-\textbf{Architecture} & TCR & ASR & TCR & ASR & TCR & ASR \\
-\midrule
-ReAct            & 92.9 & 28.6 & 100 & 14.3 & 78.6 & 28.6 \\
-PTE              & 64.3 & 42.9 & 78.6 & 28.6 & 92.9 & 21.4 \\
-Dual~LLM         & 71.4 & 14.3 & 92.9 &  7.1 & 85.7 & 14.3 \\
-Schema~Dual~LLM  & 71.4 & 14.3 & 100  &  0.0 & 92.9 &  0.0 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{table}[h]
-\caption{Extended tier Run~3 results: TCR / ASR (\%)}
-\label{tab:ext-run3}
-\centering
-\begin{tabular}{lrrrrrr}
-\toprule
-& \multicolumn{2}{c}{\textbf{Haiku~3}}
-& \multicolumn{2}{c}{\textbf{Haiku~4.5}}
-& \multicolumn{2}{c}{\textbf{Sonnet~4.5}} \\
-\cmidrule{2-3}\cmidrule{4-5}\cmidrule{6-7}
-\textbf{Architecture} & TCR & ASR & TCR & ASR & TCR & ASR \\
-\midrule
-ReAct            & 85.7 & 28.6 & 100 & 14.3 & 85.7 & 28.6 \\
-PTE              & 71.4 & 50.0 & 78.6 & 21.4 & 100  & 21.4 \\
-Dual~LLM         & 64.3 & 14.3 & 92.9 &  7.1 & 85.7 & 14.3 \\
-Schema~Dual~LLM  & 78.6 & 14.3 & 100  &  0.0 & 92.9 &  0.0 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Schema~Dual~LLM records 0\% ASR at Haiku~4.5 and Sonnet~4.5 in every single run.
-The result does not vary. Dual~LLM at Haiku~4.5 records 7.1\% in every run with
-zero variance. Dual~LLM at Sonnet~4.5 varies between 14.3\% and 21.4\% across
-runs at temperature zero, the only configuration showing non-deterministic behaviour
-on the same model at identical settings.
-
-\section{Agent System Prompts}
+\section{System Prompts}
 \label{appendix:prompts}
 
 This appendix reproduces the system prompts for the three initial agent architectures.
@@ -2332,7 +2315,7 @@ Preserve the same structure (object or array) as the input, just
 with excluded fields removed.
 \end{lstlisting}
 
-\section{Evaluation Prompt}
+\subsection{Evaluation Prompt}
 \label{appendix:judge}
 
 The judge prompt template receives five inputs for each test case and evaluates task
