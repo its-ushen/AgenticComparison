@@ -1501,6 +1501,32 @@ susceptible.
 
 The five-tier taxonomy reveals that different attack classes expose different
 architectural boundaries. No single attack class tests all of them.
+Table~\ref{tab:tier-asr} summarises ASR across tiers and architectures for the
+eight viable configurations.
+
+\begin{table*}[t]
+\caption{ASR (\%) by tier and architecture for viable configurations
+(Haiku~4.5 and Sonnet~4.5). Tier~A from v2 single run; Tiers~B and~C from
+three-run averages. $^{*}$At Haiku~3, Plan-Then-Execute produced 25\% ASR on
+Tier~B; all other Haiku~3 configurations produced 0\%.}
+\label{tab:tier-asr}
+\centering
+\begin{tabular}{lrrrrrrrr}
+\toprule
+& \multicolumn{2}{c}{\textbf{ReAct}}
+& \multicolumn{2}{c}{\textbf{PTE}}
+& \multicolumn{2}{c}{\textbf{Dual~LLM}}
+& \multicolumn{2}{c}{\textbf{Schema~DL}} \\
+\cmidrule{2-3}\cmidrule{4-5}\cmidrule{6-7}\cmidrule{8-9}
+\textbf{Tier} & H4.5 & S4.5 & H4.5 & S4.5 & H4.5 & S4.5 & H4.5 & S4.5 \\
+\midrule
+Tier~A           &  1.8 &  1.8 &  3.6 &  1.8 &  1.8 &  1.8 &  1.8 &  1.8 \\
+Tier~B$^{*}$     &  0.0 &  0.0 &  0.0 &  0.0 &  0.0 &  0.0 &  0.0 &  0.0 \\
+Tier~C Class~1   & 40.0 & 40.0 & 46.7 & 40.0 &  0.0 &  6.7 &  0.0 &  0.0 \\
+Tier~C Class~2   &  0.0 & 40.0 & 26.7 & 20.0 & 20.0 & 40.0 & \textbf{0.0} & \textbf{0.0} \\
+\bottomrule
+\end{tabular}
+\end{table*}
 
 Tier~A payloads are instruction-level attacks embedded in metadata fields, phrased
 as social engineering directives. These mirror AgentDojo's ImportantMessage template,
